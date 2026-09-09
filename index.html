@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalkulator Bunga Bank - Konversi Flat, Efektif & Anuitas</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- SheetJS (XLSX) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <i data-lucide="calculator" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            Kalkulator Bunga Bank
+            <span class="text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              Standar OJK & BI
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">Konversi Suku Bunga Flat ⇄ Efektif ⇄ Anuitas, Jadwal Angsuran & Bunga Harian</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs">
+        <button id="btn-export-excel" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3.5 py-2 rounded-lg shadow-sm transition">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          <span>Ekspor Excel (.xlsx)</span>
+        </button>
+        <button id="btn-reset" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-2 rounded-lg transition border border-slate-700">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- NAVIGATION TABS -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto space-x-1 border-t border-slate-800">
+      <button data-tab="tab-converter" class="nav-tab active flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition whitespace-nowrap">
+        <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+        <span>1. Konversi Bunga (Dual Direction)</span>
+      </button>
+      <button data-tab="tab-schedule" class="nav-tab flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition whitespace-nowrap">
+        <i data-lucide="table" class="w-4 h-4"></i>
+        <span>2. Tabel Angsuran & Komparasi</span>
+      </button>
+      <button data-tab="tab-daily" class="nav-tab flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition whitespace-nowrap">
+        <i data-lucide="clock" class="w-4 h-4"></i>
+        <span>3. Perhitungan Bunga Harian</span>
+      </button>
+      <button data-tab="tab-guide" class="nav-tab flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition whitespace-nowrap">
+        <i data-lucide="book-open" class="w-4 h-4"></i>
+        <span>4. Panduan & Formula Finansial</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-grow space-y-6">
+
+    <!-- GLOBAL INPUT PANEL & PRESETS -->
+    <section class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200/80 bank-card">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="sliders" class="w-4 h-4 text-blue-600"></i>
+            Parameter Pinjaman Utama
+          </h2>
+          <p class="text-xs text-slate-500">Sesuaikan plafon, suku bunga acuan, dan tenor untuk melihat kalkulasi secara instan.</p>
+        </div>
+
+        <!-- PRESET BUTTONS -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-semibold text-slate-400 mr-1">Preset:</span>
+          <button class="btn-preset text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 transition" data-p="500000000" data-r="8.5" data-n="180">
+            🏠 KPR 15 Thn (8.5%)
+          </button>
+          <button class="btn-preset text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 transition" data-p="250000000" data-r="4.2" data-n="48">
+            🚗 Mobil 4 Thn (4.2% Flat)
+          </button>
+          <button class="btn-preset text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 transition" data-p="50000000" data-r="9.5" data-n="24">
+            💼 KTA 2 Thn (9.5% Flat)
+          </button>
+          <button class="btn-preset text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 transition" data-p="100000000" data-r="10.5" data-n="12">
+            🏭 Modal Kerja 1 Thn (10.5%)
+          </button>
+        </div>
+      </div>
+
+      <!-- INPUT GRID -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 pt-4">
+        
+        <!-- 1. PLAFON -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Plafon Pinjaman (Pokok)</label>
+          <div class="relative">
+            <input type="text" id="input-principal-text" value="Rp 100.000.000" class="w-full pl-3 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          </div>
+          <input type="range" id="slider-principal" min="5000000" max="2000000000" step="5000000" value="100000000" class="w-full accent-blue-600 cursor-pointer">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>5 Jt</span>
+            <span>500 Jt</span>
+            <span>2 Miliar</span>
+          </div>
+        </div>
+
+        <!-- 2. SUKU BUNGA -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label id="converter-input-label" class="block text-xs font-bold uppercase tracking-wider text-slate-500">Suku Bunga Acuan (% p.a.)</label>
+            <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">per tahun</span>
+          </div>
+          <div class="relative">
+            <input type="number" id="input-rate" step="0.1" min="0.1" max="50" value="6.0" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+            <span class="absolute right-3 top-2.5 text-slate-400 font-semibold text-xs">% p.a.</span>
+          </div>
+          <input type="range" id="slider-rate" min="1" max="30" step="0.1" value="6.0" class="w-full accent-blue-600 cursor-pointer">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>1%</span>
+            <span>15%</span>
+            <span>30%</span>
+          </div>
+        </div>
+
+        <!-- 3. TENOR -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Tenor Pinjaman</label>
+            <div class="flex items-center gap-1 text-xs">
+              <span class="text-slate-400">Bln / Thn</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="relative">
+              <input type="number" id="input-tenor-months" min="1" max="360" value="12" class="w-full px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+              <span class="absolute right-2 top-2.5 text-[11px] text-slate-400 font-semibold">Bulan</span>
+            </div>
+            <div class="relative">
+              <input type="number" id="input-tenor-years" step="0.5" min="0.1" max="30" value="1.0" class="w-full px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+              <span class="absolute right-2 top-2.5 text-[11px] text-slate-400 font-semibold">Tahun</span>
+            </div>
+          </div>
+          <input type="range" id="slider-tenor" min="1" max="180" step="1" value="12" class="w-full accent-blue-600 cursor-pointer">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>1 Bln</span>
+            <span>5 Thn (60)</span>
+            <span>15 Thn (180)</span>
+          </div>
+        </div>
+
+        <!-- 4. TANGGAL & KONVENSI HARI -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Mulai Pinjaman & Basis Hari</label>
+          <input type="date" id="input-start-date" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <select id="select-convention" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+            <option value="ACTUAL_360">Basis Actual/360 (Bank Komersial RI)</option>
+            <option value="ACTUAL_365">Basis Actual/365 (Kalender Normal)</option>
+            <option value="30_360">Basis 30/360 (Standar Korporasi)</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- KPI COMPARISON SUMMARY CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-5 mt-5 border-t border-slate-100">
+        
+        <!-- CARD ANUITAS -->
+        <div class="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 relative overflow-hidden">
+          <div class="flex justify-between items-start mb-1">
+            <span class="text-xs font-bold text-indigo-900 uppercase tracking-wider">Bunga Anuitas</span>
+            <span class="badge-ann text-[10px] font-bold px-2 py-0.5 rounded-full">Cicilan Tetap</span>
+          </div>
+          <div class="text-xl md:text-2xl font-extrabold text-indigo-950 mt-1" id="kpi-annuity-pmt">Rp 0 /bln</div>
+          <div class="text-xs text-indigo-700 mt-1 flex items-center justify-between">
+            <span>Total Bunga:</span>
+            <span class="font-bold" id="kpi-annuity-interest">Rp 0</span>
+          </div>
+        </div>
+
+        <!-- CARD EFEKTIF -->
+        <div class="p-4 rounded-xl border border-emerald-100 bg-emerald-50/40 relative overflow-hidden">
+          <div class="flex justify-between items-start mb-1">
+            <span class="text-xs font-bold text-emerald-900 uppercase tracking-wider">Bunga Efektif</span>
+            <span class="badge-eff text-[10px] font-bold px-2 py-0.5 rounded-full">Menurun (Sliding)</span>
+          </div>
+          <div class="text-lg md:text-xl font-extrabold text-emerald-950 mt-1">
+            <span id="kpi-eff-pmt-first">Rp 0</span>
+            <span class="text-xs font-normal text-emerald-600 block">menurun s.d. <span id="kpi-eff-pmt-last" class="font-bold text-emerald-900">Rp 0</span></span>
+          </div>
+          <div class="text-xs text-emerald-700 mt-1 flex items-center justify-between">
+            <span>Total Bunga:</span>
+            <span class="font-bold" id="kpi-eff-interest">Rp 0</span>
+          </div>
+        </div>
+
+        <!-- CARD FLAT -->
+        <div class="p-4 rounded-xl border border-amber-100 bg-amber-50/40 relative overflow-hidden">
+          <div class="flex justify-between items-start mb-1">
+            <span class="text-xs font-bold text-amber-900 uppercase tracking-wider">Bunga Flat</span>
+            <span class="badge-flat text-[10px] font-bold px-2 py-0.5 rounded-full">Konstan</span>
+          </div>
+          <div class="text-xl md:text-2xl font-extrabold text-amber-950 mt-1" id="kpi-flat-pmt">Rp 0 /bln</div>
+          <div class="text-xs text-amber-800 mt-1 flex items-center justify-between">
+            <span>Total Bunga:</span>
+            <span class="font-bold text-rose-600" id="kpi-flat-interest">Rp 0</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SAVINGS INSIGHT BANNER -->
+      <div id="kpi-savings-text" class="mt-3 text-xs md:text-sm bg-blue-50 text-blue-900 p-3 rounded-xl border border-blue-200 flex items-center gap-2">
+        <i data-lucide="info" class="w-4 h-4 text-blue-600 flex-shrink-0"></i>
+        <span>Memuat perbandingan bunga...</span>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 1: KONVERSI SUKU BUNGA ==================== -->
+    <section id="tab-converter" class="tab-panel space-y-6">
+      
+      <!-- MODE SWITCHER -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 bank-card">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pb-5 border-b border-slate-100">
+          <div>
+            <h3 class="text-base font-bold text-slate-900" id="converter-title">Kalkulator Konversi Bunga</h3>
+            <p class="text-xs text-slate-500">Konversikan suku bunga secara dua arah menggunakan standar numerik Bank Indonesia (IRR).</p>
+          </div>
+          <div class="bg-slate-100 p-1 rounded-lg flex items-center gap-1 border border-slate-200">
+            <button id="btn-mode-flat-to-eff" class="px-4 py-2 rounded-md font-semibold text-xs sm:text-sm bg-blue-600 text-white shadow-sm transition">
+              Flat ➔ Efektif & Anuitas
+            </button>
+            <button id="btn-mode-eff-to-flat" class="px-4 py-2 rounded-md font-medium text-xs sm:text-sm text-slate-600 hover:text-slate-900 transition">
+              Efektif / Anuitas ➔ Flat
+            </button>
+          </div>
+        </div>
+
+        <!-- CONVERSION RESULTS DISPLAY -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6">
+          
+          <!-- Box 1: Bunga Efektif Eksak -->
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50/50 p-5 rounded-2xl border border-blue-200 text-center relative">
+            <div class="text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Suku Bunga Efektif Eksak (IRR)</div>
+            <div class="text-3xl font-extrabold text-blue-900" id="conv-result-rate-exact">0.00% p.a.</div>
+            <p class="text-xs text-blue-600 mt-1">Standar Nominal Tahunan Perbankan Indonesia</p>
+            <div class="mt-3 pt-3 border-t border-blue-200/60 flex justify-between text-xs text-slate-600">
+              <span>Bunga Efektif Majemuk (APY):</span>
+              <span class="font-bold text-indigo-900" id="conv-result-rate-comp">0.00%</span>
+            </div>
+          </div>
+
+          <!-- Box 2: Formula Estimasi OJK -->
+          <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-center">
+            <div class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Formula Pendekatan OJK</div>
+            <div class="text-3xl font-extrabold text-slate-800" id="conv-result-rate-ojk">0.00% p.a.</div>
+            <p class="text-xs text-slate-500 mt-1">Rumus Praktis: 2n / (n + 1) × Flat</p>
+            <div class="mt-3 pt-3 border-t border-slate-200 flex justify-between text-xs text-slate-600">
+              <span>Metode:</span>
+              <span class="font-semibold text-slate-800">Rule of Thumb</span>
+            </div>
+          </div>
+
+          <!-- Box 3: Detail Cicilan & Total Bunga -->
+          <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-col justify-center space-y-2">
+            <div class="flex justify-between text-xs text-slate-600">
+              <span>Cicilan Bulanan:</span>
+              <span class="font-bold text-slate-900" id="conv-result-pmt">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-xs text-slate-600">
+              <span>Total Beban Bunga:</span>
+              <span class="font-bold text-rose-600" id="conv-result-total-interest">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-xs text-slate-600 pt-1 border-t border-slate-200">
+              <span>Total Pengembalian:</span>
+              <span class="font-extrabold text-slate-900" id="conv-result-total-pay">Rp 0</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- DYNAMIC EXPLANATION BOX -->
+        <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200/80" id="conv-explain-box">
+          <!-- Populated by JS -->
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 2: TABEL ANGSURAN & GRAFIK ==================== -->
+    <section id="tab-schedule" class="tab-panel hidden space-y-6">
+
+      <!-- CHARTS CONTAINER -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Chart 1: Komparasi Pokok & Bunga -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm bank-card">
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 text-blue-600"></i>
+              Perbandingan Pokok vs Total Bunga
+            </h4>
+            <span class="text-[11px] text-slate-400 font-medium">Flat vs Efektif vs Anuitas</span>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="chart-comparison"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Kurva Penurunan Baki Debet -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm bank-card">
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="trending-down" class="w-4 h-4 text-emerald-600"></i>
+              Kurva Penurunan Baki Debet Pinjaman
+            </h4>
+            <span class="text-[11px] text-slate-400 font-medium">Sisa Pokok per Bulan</span>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="chart-curve"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SCHEDULE TABLE PANEL -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden bank-card">
+        
+        <!-- TABLE CONTROLS BAR -->
+        <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Tampilkan Kolom:</span>
+            <div class="flex flex-wrap items-center gap-1">
+              <button data-filter="ALL" class="table-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-sm transition">
+                Semua (Bandingan)
+              </button>
+              <button data-filter="ANUITAS" class="table-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                Hanya Anuitas
+              </button>
+              <button data-filter="EFEKTIF" class="table-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                Hanya Efektif
+              </button>
+              <button data-filter="FLAT" class="table-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                Hanya Flat
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btn-toggle-all-rows" class="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg shadow-sm transition">
+              Tampilkan Seluruh Bulan Sekaligus
+            </button>
+          </div>
+        </div>
+
+        <!-- TABLE ITSELF -->
+        <div class="schedule-table-container">
+          <table class="w-full text-left border-collapse">
+            <thead class="sticky-table-header text-xs text-slate-700 font-bold border-b border-slate-300">
+              <tr>
+                <th class="px-3 py-3 text-center w-12">Bln</th>
+                <th class="px-3 py-3 w-28">Jatuh Tempo</th>
+                <th class="px-3 py-3 text-right">Baki Debet Awal</th>
+                <th class="px-3 py-3 text-right text-blue-700">Pokok Anuitas</th>
+                <th class="px-3 py-3 text-right text-rose-600">Bunga Anuitas</th>
+                <th class="px-3 py-3 text-right bg-blue-50/80 text-blue-900 font-extrabold">Cicilan Anuitas</th>
+                <th class="px-3 py-3 text-right">Sisa Baki Debet</th>
+                <th class="px-3 py-3 text-right text-emerald-800 bg-emerald-50/40">Pokok Efektif</th>
+                <th class="px-3 py-3 text-right text-rose-600 bg-emerald-50/40">Bunga Efektif</th>
+                <th class="px-3 py-3 text-right bg-emerald-100/60 text-emerald-950 font-extrabold">Cicilan Efektif</th>
+                <th class="px-3 py-3 text-right text-amber-800 bg-amber-50/40">Pokok Flat</th>
+                <th class="px-3 py-3 text-right text-rose-600 bg-amber-50/40">Bunga Flat</th>
+                <th class="px-3 py-3 text-right bg-amber-100/60 text-amber-950 font-extrabold">Cicilan Flat</th>
+              </tr>
+            </thead>
+            <tbody id="table-schedule-body">
+              <!-- Populated by JS -->
+            </tbody>
+            <tfoot id="table-total-row">
+              <!-- Populated by JS -->
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- PAGINATION BAR -->
+        <div class="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          <span id="table-info-text">Menampilkan 12 bulan per halaman</span>
+          <div class="flex items-center gap-1.5">
+            <button id="btn-prev-page" class="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 rounded-md font-semibold transition">
+              &larr; Sebelumnya
+            </button>
+            <span class="px-2 font-bold">Halaman <span id="current-page-span">1</span> dari <span id="total-pages-span">1</span></span>
+            <button id="btn-next-page" class="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 rounded-md font-semibold transition">
+              Berikutnya &rarr;
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 3: BUNGA HARIAN ==================== -->
+    <section id="tab-daily" class="tab-panel hidden space-y-6">
+      
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 bank-card">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
+            Simulasi Bunga Harian & Pelunasan Dipercepat
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Dihitung berdasarkan saldo baki debet harian (*accrued interest*) dengan konvensi hari perbankan.</p>
+        </div>
+
+        <!-- INPUTS HARIAN -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5 pt-4 border-t border-slate-100">
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Jumlah Hari Berjalan</label>
+              <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Hari</span>
+            </div>
+            <input type="number" id="input-daily-days" min="1" max="3650" value="30" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition">
+            <input type="range" id="slider-daily-days" min="1" max="365" value="30" class="w-full accent-emerald-600 cursor-pointer">
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Biaya Penalti Pelunasan Dipercepat (%)</label>
+              <span class="text-xs font-semibold text-slate-500">Opsional</span>
+            </div>
+            <input type="number" id="input-daily-penalty" step="0.5" min="0" max="10" value="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition">
+            <p class="text-[11px] text-slate-400">Umumnya 1% - 3% dari sisa pokok untuk kredit multiguna/KPR.</p>
+          </div>
+        </div>
+
+        <!-- RESULT METRICS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Suku Bunga / Hari</span>
+            <div class="text-lg font-extrabold text-slate-900 mt-1" id="res-daily-rate">0.000000%</div>
+            <span class="text-[11px] text-slate-400">Rate tahunan / basis hari</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Bunga Berjalan / Hari</span>
+            <div class="text-lg font-extrabold text-rose-600 mt-1" id="res-daily-amount">Rp 0</div>
+            <span class="text-[11px] text-slate-400">Beban per 24 jam</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-amber-50/50 border border-amber-200">
+            <span class="text-xs font-bold text-amber-800 uppercase tracking-wider">Akumulasi Bunga</span>
+            <div class="text-lg font-extrabold text-amber-950 mt-1" id="res-daily-accrued">Rp 0</div>
+            <span class="text-[11px] text-amber-700">Total bunga berjalan</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+            <span class="text-xs font-bold text-emerald-900 uppercase tracking-wider">Total Pelunasan Hari Ini</span>
+            <div class="text-xl font-extrabold text-emerald-950 mt-1" id="res-daily-payoff">Rp 0</div>
+            <span class="text-[11px] text-emerald-700 font-medium">Pokok + Bunga + Penalti</span>
+          </div>
+        </div>
+
+        <!-- MATRIX TABLE -->
+        <div class="mt-8">
+          <h4 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+            <i data-lucide="layers" class="w-4 h-4 text-blue-600"></i>
+            Tabel Proyeksi Bunga Harian Berdasarkan Durasi
+          </h4>
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-100 text-xs font-bold text-slate-700 border-b border-slate-200">
+                <tr>
+                  <th class="px-4 py-2.5">Durasi Waktu</th>
+                  <th class="px-4 py-2.5 text-right">Akumulasi Bunga (Rp)</th>
+                  <th class="px-4 py-2.5 text-right">Pokok Pinjaman (Rp)</th>
+                  <th class="px-4 py-2.5 text-right bg-blue-50 text-blue-900">Total Pelunasan (Rp)</th>
+                </tr>
+              </thead>
+              <tbody id="table-daily-matrix-body">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 4: PANDUAN & RUMUS ==================== -->
+    <section id="tab-guide" class="tab-panel hidden space-y-6">
+      
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 bank-card space-y-6">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="graduation-cap" class="w-5 h-5 text-blue-600"></i>
+            Edukasi Finansial: Memahami Bunga Flat, Efektif, dan Anuitas
+          </h3>
+          <p class="text-xs text-slate-500 mt-1">Panduan lengkap standar perbankan dan Otoritas Jasa Keuangan (OJK) untuk debitur dan praktisi keuangan.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <!-- Guide 1: Flat -->
+          <div class="p-5 rounded-2xl border border-amber-200 bg-amber-50/30 space-y-3">
+            <div class="flex items-center gap-2 font-bold text-sm text-amber-900">
+              <span class="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs">1</span>
+              Bunga Flat (Konstan)
+            </div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Bunga dihitung dari <strong>pokok pinjaman awal</strong> yang tetap konstan setiap bulannya hingga akhir tenor kredit.
+            </p>
+            <div class="p-3 bg-white rounded-xl border border-amber-200 text-xs font-mono text-slate-800 space-y-1">
+              <div>Bunga/bln = (P × r) / 12</div>
+              <div>Pokok/bln = P / n</div>
+              <div>Cicilan = Pokok + Bunga</div>
+            </div>
+            <p class="text-[11px] text-slate-500">
+              <strong>Umum Digunakan:</strong> Kredit Kendaraan Bermotor (KKB), Kredit Tanpa Agunan (KTA), Paylater.
+            </p>
+          </div>
+
+          <!-- Guide 2: Efektif -->
+          <div class="p-5 rounded-2xl border border-emerald-200 bg-emerald-50/30 space-y-3">
+            <div class="flex items-center gap-2 font-bold text-sm text-emerald-900">
+              <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">2</span>
+              Bunga Efektif (Sliding Rate)
+            </div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Bunga dihitung dari <strong>sisa baki debet pokok pinjaman</strong>. Karena pokok dicicil rata setiap bulan, beban bunga dan total cicilan akan semakin menurun.
+            </p>
+            <div class="p-3 bg-white rounded-xl border border-emerald-200 text-xs font-mono text-slate-800 space-y-1">
+              <div>Bunga Bln-k = S_{k-1} × (r / 12)</div>
+              <div>Pokok/bln = P / n (tetap)</div>
+              <div>Cicilan Bln-k = Pokok + Bunga_k</div>
+            </div>
+            <p class="text-[11px] text-slate-500">
+              <strong>Umum Digunakan:</strong> Kredit Investasi, Kredit Modal Kerja, Pinjaman Korporasi.
+            </p>
+          </div>
+
+          <!-- Guide 3: Anuitas -->
+          <div class="p-5 rounded-2xl border border-indigo-200 bg-indigo-50/30 space-y-3">
+            <div class="flex items-center gap-2 font-bold text-sm text-indigo-900">
+              <span class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs">3</span>
+              Bunga Anuitas (Fixed Installment)
+            </div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Modifikasi dari bunga efektif agar <strong>total angsuran bulanan tepat sama</strong>. Komposisi bunga sangat besar di awal dan mengecil di akhir, sedangkan porsi pokok membesar.
+            </p>
+            <div class="p-3 bg-white rounded-xl border border-indigo-200 text-xs font-mono text-slate-800 space-y-1">
+              <div>PMT = P × [i(1+i)^n / ((1+i)^n - 1)]</div>
+              <div>Bunga Bln-k = S_{k-1} × i</div>
+              <div>Pokok Bln-k = PMT - Bunga_k</div>
+            </div>
+            <p class="text-[11px] text-slate-500">
+              <strong>Umum Digunakan:</strong> Kredit Pemilikan Rumah (KPR), Kredit Multiguna Bank.
+            </p>
+          </div>
+
+        </div>
+
+        <!-- MATEMATIKA KONVERSI OJK -->
+        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <h4 class="text-sm font-bold text-slate-900">Mengapa Suku Bunga Flat 6% Setara dengan Efektif ~10.9%?</h4>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            Pada pinjaman bunga flat, debitur tetap membayar bunga dari nilai pinjaman 100% awal, padahal pokok pinjaman telah berkurang separuhnya di pertengahan tenor kredit. Oleh karena itu, rasio bunga riil efektif yang dinikmati bank sesungguhnya hampir <strong>1.8x hingga 2x lipat</strong> dari persentase flat yang diiklankan.
+          </p>
+          <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
+            <strong>Formula OJK Rule of Thumb:</strong><br>
+            <code class="font-mono font-bold">r_efektif ≈ [ 2 × n / (n + 1) ] × r_flat</code><br>
+            Untuk tenor 12 bulan: <code>r_efektif ≈ (24 / 13) × 6% = 11.08%</code>. Algoritma Newton-Raphson perbankan menghitung nilai eksak adalah <strong>10.90%</strong>.
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+      <div>
+        <p class="font-semibold text-white">Kalkulator Bunga Bank (Flat, Efektif, Anuitas)</p>
+        <p class="text-[11px] text-slate-500">Dibuat dengan Vanilla JS murni. Siap dideploy di Vercel (Hobby Tier Gratis).</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/elpsycongroo75/kalkulator-flat-efektif-anuitas" target="_blank" rel="noopener" class="text-slate-300 hover:text-white flex items-center gap-1 transition">
+          <i data-lucide="github" class="w-4 h-4"></i>
+          <span>GitHub Repo</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Script (ES6 Module) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
