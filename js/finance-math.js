@@ -229,7 +229,7 @@ export const FinanceMath = {
     };
   },
 
-  calculateDailyInterest(P, rAnnual, days, dayCountConvention = 'ACTUAL_360', penaltyPercent = 0) {
+  calculateDailyInterest(P, rAnnual, days, dayCountConvention = 'ACTUAL_360', penaltyPercent = 0, method = 'EFEKTIF', startDate = new Date()) {
     let basis = 360;
     if (dayCountConvention === 'ACTUAL_365') basis = 365;
     else if (dayCountConvention === '30_360') basis = 360;
@@ -241,18 +241,43 @@ export const FinanceMath = {
     const penaltyFee = P * (penaltyPercent / 100);
     const totalEarlyPayoff = P + totalAccruedInterest + penaltyFee;
 
+    // Generate day-by-day projection list for UI & Excel
+    const dailySchedule = [];
+    let runningInterest = 0;
+    const sDate = new Date(startDate);
+
+    for (let d = 1; d <= days; d++) {
+      const curDate = new Date(sDate);
+      curDate.setDate(curDate.getDate() + d);
+      const interestToday = dailyInterestAmount;
+      runningInterest += interestToday;
+      const penaltyToday = P * (penaltyPercent / 100);
+
+      dailySchedule.push({
+        day: d,
+        date: curDate.toISOString().split('T')[0],
+        balance: P,
+        dailyRatePercent: dailyRate * 100,
+        dailyInterest: interestToday,
+        accruedInterest: runningInterest,
+        payoff: P + runningInterest + penaltyToday
+      });
+    }
+
     return {
       principal: P,
       rateAnnual: rAnnual,
       days,
       convention: dayCountConvention,
       basisDays: basis,
+      method,
       dailyRatePercent: dailyRate * 100,
       dailyInterestAmount,
       totalAccruedInterest,
       penaltyPercent,
       penaltyFee,
-      totalEarlyPayoff
+      totalEarlyPayoff,
+      dailySchedule
     };
   },
 

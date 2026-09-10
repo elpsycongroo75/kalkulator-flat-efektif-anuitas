@@ -1,5 +1,6 @@
 /**
  * Main Controller Application - Vanilla JS
+ * Menghubungkan UI Desain B, Engine Matematika Finansial & ExcelJS
  */
 import { FinanceMath } from './finance-math.js';
 import { FinanceCharts } from './charts.js';
@@ -7,7 +8,7 @@ import { ExcelExport } from './excel-export.js';
 
 // Application State
 const state = {
-  activeTab: 'tab-converter', // tab-converter | tab-schedule | tab-daily | tab-guide
+  activeTab: 'tab-comparison', // tab-comparison | tab-schedule | tab-daily | tab-guide
   converterMode: 'flat-to-eff', // flat-to-eff | eff-to-flat
   
   // Parameter Utama Pinjaman
@@ -23,7 +24,8 @@ const state = {
   pageSize: 12,
   showAllRows: false,
 
-  // Bunga Harian
+  // State Bunga Harian
+  dailyMethod: 'EFEKTIF', // EFEKTIF | FLAT | ANUITAS
   dailyDays: 30,
   dailyPenaltyPercent: 0,
 
@@ -57,6 +59,31 @@ const elements = {
   inputStartDate: document.getElementById('input-start-date'),
   selectConvention: document.getElementById('select-convention'),
 
+  // Desain B: Highlight Cards
+  headerRateDisplay: document.getElementById('header-rate-display'),
+  cardEffPmtFirst: document.getElementById('card-eff-pmt-first'),
+  cardEffPmtLast: document.getElementById('card-eff-pmt-last'),
+  cardEffInterest: document.getElementById('card-eff-interest'),
+  cardEffTotalPay: document.getElementById('card-eff-total-pay'),
+
+  cardAnnPmt: document.getElementById('card-ann-pmt'),
+  cardAnnInterest: document.getElementById('card-ann-interest'),
+  cardAnnTotalPay: document.getElementById('card-ann-total-pay'),
+  cardAnnDiff: document.getElementById('card-ann-diff'),
+
+  cardFlatPmt: document.getElementById('card-flat-pmt'),
+  cardFlatInterest: document.getElementById('card-flat-interest'),
+  cardFlatTotalPay: document.getElementById('card-flat-total-pay'),
+  cardFlatDiff: document.getElementById('card-flat-diff'),
+
+  // Savings Banner
+  bannerSavingsHeadline: document.getElementById('banner-savings-headline'),
+  bannerSavingsBadge: document.getElementById('banner-savings-badge'),
+  bannerSavingsDesc: document.getElementById('banner-savings-desc'),
+
+  // Matrix Table
+  matrixComparisonTbody: document.getElementById('matrix-comparison-tbody'),
+
   // Converter Elements
   btnModeFlatToEff: document.getElementById('btn-mode-flat-to-eff'),
   btnModeEffToFlat: document.getElementById('btn-mode-eff-to-flat'),
@@ -70,16 +97,6 @@ const elements = {
   convResultTotalPay: document.getElementById('conv-result-total-pay'),
   convExplainBox: document.getElementById('conv-explain-box'),
 
-  // Summary Cards
-  kpiAnnuityPmt: document.getElementById('kpi-annuity-pmt'),
-  kpiAnnuityInterest: document.getElementById('kpi-annuity-interest'),
-  kpiEffPmtFirst: document.getElementById('kpi-eff-pmt-first'),
-  kpiEffPmtLast: document.getElementById('kpi-eff-pmt-last'),
-  kpiEffInterest: document.getElementById('kpi-eff-interest'),
-  kpiFlatPmt: document.getElementById('kpi-flat-pmt'),
-  kpiFlatInterest: document.getElementById('kpi-flat-interest'),
-  kpiSavingsText: document.getElementById('kpi-savings-text'),
-
   // Table Controls
   tableFilterButtons: document.querySelectorAll('.table-filter-btn'),
   tableScheduleBody: document.getElementById('table-schedule-body'),
@@ -92,17 +109,25 @@ const elements = {
   totalPagesSpan: document.getElementById('total-pages-span'),
 
   // Daily Simulator
+  dailyMethodButtons: document.querySelectorAll('.daily-method-btn'),
   inputDailyDays: document.getElementById('input-daily-days'),
   sliderDailyDays: document.getElementById('slider-daily-days'),
+  dailyChips: document.querySelectorAll('.btn-daily-chip'),
   inputDailyPenalty: document.getElementById('input-daily-penalty'),
   resDailyRate: document.getElementById('res-daily-rate'),
   resDailyAmount: document.getElementById('res-daily-amount'),
   resDailyAccrued: document.getElementById('res-daily-accrued'),
+  resDailyAccruedSub: document.getElementById('res-daily-accrued-sub'),
   resDailyPayoff: document.getElementById('res-daily-payoff'),
-  tableDailyMatrixBody: document.getElementById('table-daily-matrix-body'),
+  tableDailyScheduleBody: document.getElementById('table-daily-schedule-body'),
+  dailyTableCountLabel: document.getElementById('daily-table-count-label'),
+  btnQuickExportDaily: document.getElementById('btn-quick-export-daily'),
+  btnQuickExportDailyText: document.getElementById('btn-quick-export-daily-text'),
 
-  // Action Buttons
-  btnExportExcel: document.getElementById('btn-export-excel'),
+  // Dropdown Export
+  btnExportDropdownToggle: document.getElementById('btn-export-dropdown-toggle'),
+  exportMenuDropdown: document.getElementById('export-menu-dropdown'),
+  btnDoExports: document.querySelectorAll('.btn-do-export'),
   btnReset: document.getElementById('btn-reset')
 };
 
@@ -113,7 +138,9 @@ function init() {
   }
   setupEventListeners();
   recalculateAll();
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
 }
 
 // Recalculate Everything
@@ -141,36 +168,114 @@ function recalculateAll() {
     r,
     state.dailyDays,
     state.dayCountConvention,
-    state.dailyPenaltyPercent
+    state.dailyPenaltyPercent,
+    state.dailyMethod,
+    start
   );
 
   // Update UI Views
-  updateKPIs();
+  updateDesainBViews();
   updateConverterUI();
   updateTableSchedule();
   updateDailyUI();
   updateCharts();
 }
 
-// Update KPI Cards
-function updateKPIs() {
+// Update Desain B UI Views
+function updateDesainBViews() {
   const { flat, effective, annuity } = state.results;
+  const P = state.principal;
+  const n = state.nMonths;
+  const r = state.rateAnnual;
 
-  elements.kpiAnnuityPmt.textContent = FinanceMath.formatRupiah(annuity.monthlyInstallment) + ' /bln';
-  elements.kpiAnnuityInterest.textContent = FinanceMath.formatRupiah(annuity.totalInterest);
+  // Header status
+  if (elements.headerRateDisplay) {
+    elements.headerRateDisplay.textContent = `${r}% p.a. • ${n} Bulan (${(n / 12).toFixed(1)} Thn)`;
+  }
 
-  elements.kpiEffPmtFirst.textContent = FinanceMath.formatRupiah(effective.firstInstallment);
-  elements.kpiEffPmtLast.textContent = FinanceMath.formatRupiah(effective.lastInstallment);
-  elements.kpiEffInterest.textContent = FinanceMath.formatRupiah(effective.totalInterest);
+  // Card 1: Efektif
+  if (elements.cardEffPmtFirst) {
+    elements.cardEffPmtFirst.textContent = FinanceMath.formatRupiah(effective.firstInstallment);
+    elements.cardEffPmtLast.textContent = FinanceMath.formatRupiah(effective.lastInstallment);
+    elements.cardEffInterest.textContent = FinanceMath.formatRupiah(effective.totalInterest);
+    elements.cardEffTotalPay.textContent = FinanceMath.formatRupiah(effective.totalPayment);
+  }
 
-  elements.kpiFlatPmt.textContent = FinanceMath.formatRupiah(flat.monthlyInstallment) + ' /bln';
-  elements.kpiFlatInterest.textContent = FinanceMath.formatRupiah(flat.totalInterest);
+  // Card 2: Anuitas
+  if (elements.cardAnnPmt) {
+    elements.cardAnnPmt.textContent = FinanceMath.formatRupiah(annuity.monthlyInstallment) + ' /bln';
+    elements.cardAnnInterest.textContent = FinanceMath.formatRupiah(annuity.totalInterest);
+    elements.cardAnnTotalPay.textContent = FinanceMath.formatRupiah(annuity.totalPayment);
+    const annDiff = annuity.totalInterest - effective.totalInterest;
+    elements.cardAnnDiff.textContent = annDiff >= 0 
+      ? `+${FinanceMath.formatRupiah(annDiff)}` 
+      : `-${FinanceMath.formatRupiah(Math.abs(annDiff))}`;
+  }
 
-  const savings = flat.totalInterest - effective.totalInterest;
-  if (savings > 0) {
-    elements.kpiSavingsText.innerHTML = `Hemat bunga <strong>${FinanceMath.formatRupiah(savings)}</strong> jika memilih bunga Efektif/Anuitas dibanding Flat pada persentase sama!`;
-  } else {
-    elements.kpiSavingsText.textContent = `Total bunga Flat, Efektif, dan Anuitas terhitung secara transparan.`;
+  // Card 3: Flat
+  if (elements.cardFlatPmt) {
+    elements.cardFlatPmt.textContent = FinanceMath.formatRupiah(flat.monthlyInstallment) + ' /bln';
+    elements.cardFlatInterest.textContent = FinanceMath.formatRupiah(flat.totalInterest);
+    elements.cardFlatTotalPay.textContent = FinanceMath.formatRupiah(flat.totalPayment);
+    const flatDiff = flat.totalInterest - effective.totalInterest;
+    elements.cardFlatDiff.textContent = `+${FinanceMath.formatRupiah(flatDiff)} (Boros)`;
+  }
+
+  // Savings Banner
+  const savings = Math.round(flat.totalInterest - effective.totalInterest);
+  const savingsPercent = ((savings / flat.totalInterest) * 100).toFixed(1);
+
+  if (elements.bannerSavingsHeadline) {
+    elements.bannerSavingsHeadline.textContent = `Hemat ${FinanceMath.formatRupiah(savings)} (${savingsPercent}%) dengan Bunga Efektif!`;
+    elements.bannerSavingsBadge.textContent = `Total Selisih: ${FinanceMath.formatRupiah(savings)}`;
+    elements.bannerSavingsDesc.innerHTML = `
+      Jika nasabah meminjam <strong>${FinanceMath.formatRupiah(P)}</strong> selama <strong>${n} bulan</strong> pada suku bunga <strong>${r}% p.a.</strong>:<br>
+      • Pada <strong>Bunga Efektif</strong>, total bunga yang dibayar hanya <strong>${FinanceMath.formatRupiah(effective.totalInterest)}</strong>.<br>
+      • Pada <strong>Bunga Flat</strong>, total bunga melonjak menjadi <strong>${FinanceMath.formatRupiah(flat.totalInterest)}</strong>.<br>
+      💡 Memilih skema Bunga Efektif secara cerdas menghemat pengeluaran bunga hingga <strong>${savingsPercent}%</strong>!
+    `;
+  }
+
+  // Matrix Table
+  if (elements.matrixComparisonTbody) {
+    elements.matrixComparisonTbody.innerHTML = `
+      <tr class="border-b border-slate-200 hover:bg-emerald-50/40 font-medium">
+        <td class="px-4 py-3 font-bold text-emerald-900 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+          Bunga Efektif (Sliding)
+        </td>
+        <td class="px-4 py-3 text-right">${r}%</td>
+        <td class="px-4 py-3 text-right">${FinanceMath.formatNumber(effective.firstInstallment)}</td>
+        <td class="px-4 py-3 text-right text-emerald-800 font-semibold">${FinanceMath.formatNumber(effective.lastInstallment)}</td>
+        <td class="px-4 py-3 text-right text-emerald-700 font-bold">${FinanceMath.formatNumber(effective.totalInterest)}</td>
+        <td class="px-4 py-3 text-right font-bold text-slate-900">${FinanceMath.formatNumber(effective.totalPayment)}</td>
+        <td class="px-4 py-3 text-right text-emerald-700 font-bold">Rp 0 (Referensi Paling Hemat)</td>
+      </tr>
+      <tr class="border-b border-slate-200 hover:bg-indigo-50/40">
+        <td class="px-4 py-3 font-bold text-indigo-900 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
+          Bunga Anuitas (Cicilan Rata)
+        </td>
+        <td class="px-4 py-3 text-right">${r}%</td>
+        <td class="px-4 py-3 text-right">${FinanceMath.formatNumber(annuity.monthlyInstallment)}</td>
+        <td class="px-4 py-3 text-right">${FinanceMath.formatNumber(annuity.monthlyInstallment)}</td>
+        <td class="px-4 py-3 text-right text-indigo-700 font-bold">${FinanceMath.formatNumber(annuity.totalInterest)}</td>
+        <td class="px-4 py-3 text-right font-bold text-slate-900">${FinanceMath.formatNumber(annuity.totalPayment)}</td>
+        <td class="px-4 py-3 text-right text-indigo-800 font-semibold">+${FinanceMath.formatRupiah(annuity.totalInterest - effective.totalInterest)}</td>
+      </tr>
+      <tr class="border-b border-slate-200 hover:bg-amber-50/40">
+        <td class="px-4 py-3 font-bold text-amber-900 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+          Bunga Flat (Tetap)
+        </td>
+        <td class="px-4 py-3 text-right">${r}%</td>
+        <td class="px-4 py-3 text-right">${FinanceMath.formatNumber(flat.monthlyInstallment)}</td>
+        <td class="px-4 py-3 text-right">${FinanceMath.formatNumber(flat.monthlyInstallment)}</td>
+        <td class="px-4 py-3 text-right text-rose-600 font-bold">${FinanceMath.formatNumber(flat.totalInterest)}</td>
+        <td class="px-4 py-3 text-right font-bold text-slate-900">${FinanceMath.formatNumber(flat.totalPayment)}</td>
+        <td class="px-4 py-3 text-right text-rose-600 font-extrabold">+${FinanceMath.formatRupiah(flat.totalInterest - effective.totalInterest)} (Tertinggi)</td>
+      </tr>
+    `;
   }
 }
 
@@ -321,26 +426,43 @@ function updateDailyUI() {
   elements.resDailyRate.textContent = d.dailyRatePercent.toFixed(6) + '% /hari';
   elements.resDailyAmount.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount) + ' /hari';
   elements.resDailyAccrued.textContent = FinanceMath.formatRupiah(d.totalAccruedInterest);
+  elements.resDailyAccruedSub.textContent = `Total bunga ${d.days} hari (${state.dailyMethod})`;
   elements.resDailyPayoff.textContent = FinanceMath.formatRupiah(d.totalEarlyPayoff);
 
-  // Matrix Sample Days
-  const samplePeriods = [1, 7, 14, 30, 45, 60, 90, 120, 180, 270, 360];
-  let matrixHtml = '';
+  // Update button label
+  if (elements.btnQuickExportDailyText) {
+    elements.btnQuickExportDailyText.textContent = `Unduh Excel Bunga Harian (${state.dailyMethod})`;
+  }
 
-  samplePeriods.forEach(days => {
-    const interest = d.dailyInterestAmount * days;
-    const total = d.principal + interest;
-    matrixHtml += `
-      <tr class="border-b border-slate-200 hover:bg-slate-50 text-xs md:text-sm">
-        <td class="px-4 py-2 font-medium text-slate-800">${days} Hari</td>
-        <td class="px-4 py-2 text-right text-rose-600 font-medium">${FinanceMath.formatRupiah(interest)}</td>
-        <td class="px-4 py-2 text-right text-slate-600">${FinanceMath.formatRupiah(d.principal)}</td>
-        <td class="px-4 py-2 text-right font-bold text-blue-900 bg-blue-50/50">${FinanceMath.formatRupiah(total)}</td>
-      </tr>
-    `;
+  // Update Daily Method Buttons Styling
+  elements.dailyMethodButtons.forEach(btn => {
+    const m = btn.getAttribute('data-daily-method');
+    if (m === state.dailyMethod) {
+      btn.className = 'daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20';
+    } else {
+      btn.className = 'daily-method-btn p-3 rounded-xl border text-left flex items-start gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300';
+    }
   });
 
-  elements.tableDailyMatrixBody.innerHTML = matrixHtml;
+  // Render Day-by-Day Schedule Table
+  if (elements.tableDailyScheduleBody && d.dailySchedule) {
+    elements.dailyTableCountLabel.textContent = `Menampilkan ${d.dailySchedule.length} hari proyeksi (${state.dailyMethod})`;
+    let scheduleHtml = '';
+    d.dailySchedule.forEach(item => {
+      scheduleHtml += `
+        <tr class="border-b border-slate-200 hover:bg-slate-50 text-xs md:text-sm">
+          <td class="px-4 py-2 text-center font-bold text-slate-900 bg-slate-50">${item.day}</td>
+          <td class="px-4 py-2 text-slate-600">${item.date}</td>
+          <td class="px-4 py-2 text-right font-medium text-slate-700">${FinanceMath.formatRupiah(item.balance)}</td>
+          <td class="px-4 py-2 text-right font-mono text-[11px] text-slate-500">${item.dailyRatePercent.toFixed(6)}%</td>
+          <td class="px-4 py-2 text-right text-rose-600 font-medium">${FinanceMath.formatRupiah(item.dailyInterest)}</td>
+          <td class="px-4 py-2 text-right text-amber-800 font-bold">${FinanceMath.formatRupiah(item.accruedInterest)}</td>
+          <td class="px-4 py-2 text-right font-extrabold text-emerald-950 bg-emerald-50/50">${FinanceMath.formatRupiah(item.payoff)}</td>
+        </tr>
+      `;
+    });
+    elements.tableDailyScheduleBody.innerHTML = scheduleHtml;
+  }
 }
 
 // Update Charts
@@ -348,6 +470,24 @@ function updateCharts() {
   const { flat, effective, annuity } = state.results;
   FinanceCharts.renderComparisonChart('chart-comparison', flat, effective, annuity);
   FinanceCharts.renderAmortizationCurveChart('chart-curve', flat, effective, annuity);
+}
+
+// Export Trigger Helper
+function triggerExcelExport(mode = 'ALL') {
+  ExcelExport.exportAmortizationWorkbook({
+    flatData: state.results.flat,
+    effData: state.results.effective,
+    annData: state.results.annuity,
+    dailyData: state.results.daily,
+    params: {
+      principal: state.principal,
+      rateAnnual: state.rateAnnual,
+      nMonths: state.nMonths,
+      startDate: state.startDate,
+      dayCountConvention: state.dayCountConvention
+    },
+    exportMode: mode
+  });
 }
 
 // Event Listeners
@@ -378,16 +518,16 @@ function setupEventListeners() {
   // Converter Mode Buttons
   elements.btnModeFlatToEff.addEventListener('click', () => {
     state.converterMode = 'flat-to-eff';
-    elements.btnModeFlatToEff.className = 'px-4 py-2 rounded-md font-semibold text-sm bg-blue-600 text-white shadow-sm';
-    elements.btnModeEffToFlat.className = 'px-4 py-2 rounded-md font-medium text-sm text-slate-600 hover:text-slate-900';
+    elements.btnModeFlatToEff.className = 'px-4 py-2 rounded-md font-semibold text-xs sm:text-sm bg-blue-600 text-white shadow-sm';
+    elements.btnModeEffToFlat.className = 'px-4 py-2 rounded-md font-medium text-xs sm:text-sm text-slate-600 hover:text-slate-900';
     elements.converterInputLabel.textContent = 'Suku Bunga Flat (% per tahun)';
     recalculateAll();
   });
 
   elements.btnModeEffToFlat.addEventListener('click', () => {
     state.converterMode = 'eff-to-flat';
-    elements.btnModeEffToFlat.className = 'px-4 py-2 rounded-md font-semibold text-sm bg-blue-600 text-white shadow-sm';
-    elements.btnModeFlatToEff.className = 'px-4 py-2 rounded-md font-medium text-sm text-slate-600 hover:text-slate-900';
+    elements.btnModeEffToFlat.className = 'px-4 py-2 rounded-md font-semibold text-xs sm:text-sm bg-blue-600 text-white shadow-sm';
+    elements.btnModeFlatToEff.className = 'px-4 py-2 rounded-md font-medium text-xs sm:text-sm text-slate-600 hover:text-slate-900';
     elements.converterInputLabel.textContent = 'Suku Bunga Efektif/Anuitas (% per tahun)';
     recalculateAll();
   });
@@ -420,7 +560,7 @@ function setupEventListeners() {
   elements.inputPrincipalText.addEventListener('input', (e) => {
     const val = FinanceMath.parseRupiah(e.target.value);
     state.principal = val;
-    elements.sliderPrincipal.value = Math.min(val, 5000000000);
+    elements.sliderPrincipal.value = Math.min(val, 2000000000);
     recalculateAll();
   });
 
@@ -494,6 +634,25 @@ function setupEventListeners() {
     recalculateAll();
   });
 
+  // Daily Method Buttons
+  elements.dailyMethodButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.dailyMethod = btn.getAttribute('data-daily-method');
+      recalculateAll();
+    });
+  });
+
+  // Daily Chips
+  elements.dailyChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const d = parseInt(chip.getAttribute('data-days'), 10);
+      state.dailyDays = d;
+      elements.inputDailyDays.value = d;
+      elements.sliderDailyDays.value = Math.min(d, 365);
+      recalculateAll();
+    });
+  });
+
   // Daily Simulator Inputs
   elements.inputDailyDays.addEventListener('input', (e) => {
     let val = parseInt(e.target.value, 10) || 1;
@@ -514,6 +673,18 @@ function setupEventListeners() {
     state.dailyPenaltyPercent = parseFloat(e.target.value) || 0;
     recalculateAll();
   });
+
+  // Quick Export Daily Button
+  if (elements.btnQuickExportDaily) {
+    elements.btnQuickExportDaily.addEventListener('click', () => {
+      const modeMap = {
+        'EFEKTIF': 'DAILY_EFEKTIF',
+        'FLAT': 'DAILY_FLAT',
+        'ANUITAS': 'DAILY_ANUITAS'
+      };
+      triggerExcelExport(modeMap[state.dailyMethod] || 'DAILY_EFEKTIF');
+    });
+  }
 
   // Table Filter Buttons
   elements.tableFilterButtons.forEach(btn => {
@@ -549,22 +720,27 @@ function setupEventListeners() {
     updateTableSchedule();
   });
 
-  // Export Excel
-  elements.btnExportExcel.addEventListener('click', () => {
-    ExcelExport.exportAmortizationWorkbook({
-      flatData: state.results.flat,
-      effData: state.results.effective,
-      annData: state.results.annuity,
-      dailyData: state.results.daily,
-      params: {
-        principal: state.principal,
-        rateAnnual: state.rateAnnual,
-        nMonths: state.nMonths,
-        startDate: state.startDate,
-        dayCountConvention: state.dayCountConvention
+  // Dropdown Export Toggle
+  if (elements.btnExportDropdownToggle && elements.exportMenuDropdown) {
+    elements.btnExportDropdownToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      elements.exportMenuDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!elements.exportMenuDropdown.contains(e.target) && e.target !== elements.btnExportDropdownToggle) {
+        elements.exportMenuDropdown.classList.add('hidden');
       }
     });
-  });
+
+    elements.btnDoExports.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-export-mode') || 'ALL';
+        elements.exportMenuDropdown.classList.add('hidden');
+        triggerExcelExport(mode);
+      });
+    });
+  }
 
   // Reset
   elements.btnReset.addEventListener('click', () => {
@@ -573,6 +749,8 @@ function setupEventListeners() {
     state.nMonths = 12;
     state.converterMode = 'flat-to-eff';
     state.page = 1;
+    state.dailyDays = 30;
+    state.dailyMethod = 'EFEKTIF';
 
     elements.inputPrincipalText.value = FinanceMath.formatRupiah(state.principal);
     elements.sliderPrincipal.value = state.principal;
@@ -581,6 +759,8 @@ function setupEventListeners() {
     elements.inputTenorMonths.value = state.nMonths;
     elements.inputTenorYears.value = (state.nMonths / 12).toFixed(1);
     elements.sliderTenor.value = state.nMonths;
+    elements.inputDailyDays.value = state.dailyDays;
+    elements.sliderDailyDays.value = state.dailyDays;
 
     recalculateAll();
   });

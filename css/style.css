@@ -33,9 +33,9 @@ body {
 
 /* Tab Navigation Active State */
 .nav-tab.active {
-  color: #1e40af;
-  border-bottom: 3px solid #1e40af;
-  background-color: #eff6ff;
+  color: #2563eb;
+  border-bottom: 3px solid #2563eb;
+  background-color: rgba(37, 99, 235, 0.1);
   font-weight: 700;
 }
 
@@ -80,6 +80,11 @@ body {
   top: 0;
   z-index: 10;
   background-color: #f1f5f9;
+}
+
+/* Daily method buttons active state */
+.daily-method-btn.active {
+  box-shadow: 0 4px 12px -2px rgba(5, 150, 105, 0.2);
 }
 
 /* Number input custom spinner removal */
