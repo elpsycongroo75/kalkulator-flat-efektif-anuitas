@@ -35,6 +35,7 @@ async function testExport() {
   console.log(`✓ Workbook 'ALL' generated with ${wbAll.worksheets.length} sheets.`);
 
   // Verify Sheet 2 (Daily Efektif) vs Sheet 3 (Daily Flat) vs Sheet 4 (Daily Anuitas)
+  const wsSummary_check = wbAll.getWorksheet('1. Ringkasan & Komparasi');
   const wsEff = wbAll.getWorksheet('2. Bunga Harian - Efektif');
   const wsFlat = wbAll.getWorksheet('3. Bunga Harian - Flat');
   const wsAnn = wbAll.getWorksheet('4. Bunga Harian - Anuitas');
@@ -52,6 +53,10 @@ async function testExport() {
   console.assert(flatDay360Accrued === 6000000, `Expected Flat 6,000,000, got ${flatDay360Accrued}`);
   console.assert(annDay360Accrued === 3279716, `Expected Anuitas 3,279,716, got ${annDay360Accrued}`);
   console.log("✓ Verified: Excel Daily Worksheets have distinct, accurate financial values!");
+  // Verify Column A width is compact (not blown up by merged title strings)
+  console.assert(wsEff.getColumn(1).width === 12, `Expected Daily Col A width 12, got ${wsEff.getColumn(1).width}`);
+  console.assert(wsSummary_check.getColumn(1).width === 28, `Expected Summary Col A width 28, got ${wsSummary_check.getColumn(1).width}`);
+  console.log(`✓ Verified: Column widths are strictly proportional (Daily Col A = ${wsEff.getColumn(1).width}, Summary Col A = ${wsSummary_check.getColumn(1).width})!`);
 
   console.log("\nALL EXCEL EXPORT VERIFICATION TESTS PASSED SUCCESSFULLY! 🚀");
 }
