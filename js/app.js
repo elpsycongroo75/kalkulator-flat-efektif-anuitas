@@ -26,7 +26,8 @@ const state = {
 
   // State Bunga Harian
   dailyMethod: 'EFEKTIF', // EFEKTIF | FLAT | ANUITAS
-  dailyDays: 30,
+  dailyFacilityType: 'AMORTIZING', // AMORTIZING | REKENING_KORAN
+  dailyDays: 360,
   dailyPenaltyPercent: 0,
 
   // Hasil Kalkulasi
@@ -109,16 +110,26 @@ const elements = {
   totalPagesSpan: document.getElementById('total-pages-span'),
 
   // Daily Simulator
+  dailyFacilityButtons: document.querySelectorAll('.daily-facility-btn'),
+  facilityDescText: document.getElementById('facility-desc-text'),
   dailyMethodButtons: document.querySelectorAll('.daily-method-btn'),
   inputDailyDays: document.getElementById('input-daily-days'),
   sliderDailyDays: document.getElementById('slider-daily-days'),
   dailyChips: document.querySelectorAll('.btn-daily-chip'),
   inputDailyPenalty: document.getElementById('input-daily-penalty'),
+  labelTenorEquiv: document.getElementById('label-tenor-equiv'),
   resDailyRate: document.getElementById('res-daily-rate'),
+  resDailyRateSub: document.getElementById('res-daily-rate-sub'),
   resDailyAmount: document.getElementById('res-daily-amount'),
+  resDailyAmountSub: document.getElementById('res-daily-amount-sub'),
   resDailyAccrued: document.getElementById('res-daily-accrued'),
   resDailyAccruedSub: document.getElementById('res-daily-accrued-sub'),
   resDailyPayoff: document.getElementById('res-daily-payoff'),
+  resDailyPayoffSub: document.getElementById('res-daily-payoff-sub'),
+  dailyCompDayNum: document.getElementById('daily-comp-day-num'),
+  dailyCompSavingsTag: document.getElementById('daily-comp-savings-tag'),
+  dailyHeadToHeadTbody: document.getElementById('daily-head-to-head-tbody'),
+  dailyHeadToHeadNote: document.getElementById('daily-head-to-head-note'),
   tableDailyScheduleBody: document.getElementById('table-daily-schedule-body'),
   dailyTableCountLabel: document.getElementById('daily-table-count-label'),
   btnQuickExportDaily: document.getElementById('btn-quick-export-daily'),
@@ -162,7 +173,7 @@ function recalculateAll() {
     state.results.conversion = FinanceMath.convertEffectiveToFlat(P, r, n);
   }
 
-  // 3. Calculate Daily
+  // 3. Calculate Daily dengan nMonths dan facilityType akurat
   state.results.daily = FinanceMath.calculateDailyInterest(
     P,
     r,
@@ -170,7 +181,9 @@ function recalculateAll() {
     state.dayCountConvention,
     state.dailyPenaltyPercent,
     state.dailyMethod,
-    start
+    start,
+    state.nMonths,
+    state.dailyFacilityType
   );
 
   // Update UI Views
@@ -423,30 +436,154 @@ function updateDailyUI() {
   const d = state.results.daily;
   if (!d) return;
 
+  const comp = d.comparison || {};
+  const activeMethod = state.dailyMethod;
+  const isAmortizing = state.dailyFacilityType === 'AMORTIZING';
+
+  // Label tenor ekuivalen
+  if (elements.labelTenorEquiv) {
+    const blnEquiv = (d.days / 30).toFixed(1);
+    elements.labelTenorEquiv.textContent = `${d.days} Hari (~${blnEquiv} Bulan)`;
+  }
+
+  // Facility buttons styling
+  if (elements.dailyFacilityButtons) {
+    elements.dailyFacilityButtons.forEach(btn => {
+      const f = btn.getAttribute('data-facility');
+      if (f === state.dailyFacilityType) {
+        btn.className = 'daily-facility-btn active p-3 rounded-xl border text-left flex items-center gap-3 transition bg-blue-50 border-blue-500 text-blue-950 ring-2 ring-blue-500/20';
+      } else {
+        btn.className = 'daily-facility-btn p-3 rounded-xl border text-left flex items-center gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300';
+      }
+    });
+  }
+
+  if (elements.facilityDescText) {
+    elements.facilityDescText.textContent = isAmortizing 
+      ? `Kredit angsuran berjangka ${state.nMonths} bulan (baki debet berkurang tiap bulan)` 
+      : 'Fasilitas Rekening Koran (PRK) / Cerukan (pokok konstan, bunga harian efektif)';
+  }
+
+  // Suku bunga per hari
   elements.resDailyRate.textContent = d.dailyRatePercent.toFixed(6) + '% /hari';
+  if (elements.resDailyRateSub) {
+    elements.resDailyRateSub.textContent = activeMethod === 'FLAT' 
+      ? `Rate nominal flat (Riil: ~${((state.rateAnnual * (2 * state.nMonths) / (state.nMonths + 1)) / d.basisDays).toFixed(4)}% /hari)` 
+      : `Rate acuan: ${state.rateAnnual}% p.a. / ${d.basisDays} hari`;
+  }
+
+  // Bunga hari ini
   elements.resDailyAmount.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount) + ' /hari';
+  if (elements.resDailyAmountSub) {
+    elements.resDailyAmountSub.textContent = isAmortizing 
+      ? `Beban bunga pada hari ke-${d.days} (${activeMethod})` 
+      : `Beban 24 jam saldo Rp ${FinanceMath.formatNumber(d.principal)}`;
+  }
+
+  // Akumulasi bunga s.d. hari ini
   elements.resDailyAccrued.textContent = FinanceMath.formatRupiah(d.totalAccruedInterest);
-  elements.resDailyAccruedSub.textContent = `Total bunga ${d.days} hari (${state.dailyMethod})`;
+  elements.resDailyAccruedSub.textContent = `Total bunga ${d.days} hari (${activeMethod})`;
+
+  // Total pelunasan
   elements.resDailyPayoff.textContent = FinanceMath.formatRupiah(d.totalEarlyPayoff);
+  if (elements.resDailyPayoffSub) {
+    elements.resDailyPayoffSub.textContent = `Sisa Pokok (${FinanceMath.formatRupiah(d.remainingBalance)}) + Bunga + Penalti`;
+  }
 
   // Update button label
   if (elements.btnQuickExportDailyText) {
-    elements.btnQuickExportDailyText.textContent = `Unduh Excel Bunga Harian (${state.dailyMethod})`;
+    elements.btnQuickExportDailyText.textContent = `Unduh Excel Bunga Harian (${activeMethod})`;
   }
 
   // Update Daily Method Buttons Styling
   elements.dailyMethodButtons.forEach(btn => {
     const m = btn.getAttribute('data-daily-method');
     if (m === state.dailyMethod) {
-      btn.className = 'daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20';
+      if (m === 'EFEKTIF') {
+        btn.className = 'daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20';
+      } else if (m === 'ANUITAS') {
+        btn.className = 'daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-indigo-50 border-indigo-500 text-indigo-950 ring-2 ring-indigo-500/20';
+      } else {
+        btn.className = 'daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-amber-50 border-amber-500 text-amber-950 ring-2 ring-amber-500/20';
+      }
     } else {
       btn.className = 'daily-method-btn p-3 rounded-xl border text-left flex items-start gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300';
     }
   });
 
+  // Render Head-to-Head Comparison on Day D
+  if (elements.dailyCompDayNum) elements.dailyCompDayNum.textContent = d.days;
+
+  if (comp.flat && comp.effective && comp.annuity && elements.dailyHeadToHeadTbody) {
+    const savings = Math.round(comp.savingsVsFlat);
+    if (elements.dailyCompSavingsTag) {
+      elements.dailyCompSavingsTag.textContent = savings > 0 
+        ? `⭐ Hemat ${FinanceMath.formatRupiah(savings)} dengan Efektif` 
+        : 'Beban Bunga Sama di Awal Pinjaman';
+    }
+
+    elements.dailyHeadToHeadTbody.innerHTML = `
+      <tr class="hover:bg-slate-800/60 ${activeMethod === 'EFEKTIF' ? 'bg-emerald-950/40 text-emerald-200 font-bold' : ''}">
+        <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Bunga Efektif (Sliding)
+        </td>
+        <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.effective.dailyInterestAmount)}</td>
+        <td class="px-3 py-2.5 text-right font-extrabold text-emerald-300">${FinanceMath.formatRupiah(comp.effective.totalAccruedInterest)}</td>
+        <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.effective.remainingBalance)}</td>
+        <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.effective.totalEarlyPayoff)}</td>
+        <td class="px-3 py-2.5 text-center">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            ⭐ Paling Hemat
+          </span>
+        </td>
+      </tr>
+      <tr class="hover:bg-slate-800/60 ${activeMethod === 'ANUITAS' ? 'bg-indigo-950/40 text-indigo-200 font-bold' : ''}">
+        <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
+          <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+          Bunga Anuitas (Cicilan Rata)
+        </td>
+        <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.annuity.dailyInterestAmount)}</td>
+        <td class="px-3 py-2.5 text-right font-extrabold text-indigo-300">${FinanceMath.formatRupiah(comp.annuity.totalAccruedInterest)}</td>
+        <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.annuity.remainingBalance)}</td>
+        <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.annuity.totalEarlyPayoff)}</td>
+        <td class="px-3 py-2.5 text-center">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+            ⚖️ Teratur (KPR)
+          </span>
+        </td>
+      </tr>
+      <tr class="hover:bg-slate-800/60 ${activeMethod === 'FLAT' ? 'bg-amber-950/40 text-amber-200 font-bold' : ''}">
+        <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          Bunga Flat (Tetap)
+        </td>
+        <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.flat.dailyInterestAmount)}</td>
+        <td class="px-3 py-2.5 text-right font-extrabold text-rose-300">${FinanceMath.formatRupiah(comp.flat.totalAccruedInterest)}</td>
+        <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.flat.remainingBalance)}</td>
+        <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.flat.totalEarlyPayoff)}</td>
+        <td class="px-3 py-2.5 text-center">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            ⚠️ Tertinggi
+          </span>
+        </td>
+      </tr>
+    `;
+
+    if (elements.dailyHeadToHeadNote) {
+      if (!isAmortizing) {
+        elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mode Rekening Koran (PRK):</strong> Saldo pokok pinjaman tetap utuh Rp ${FinanceMath.formatNumber(d.principal)} (tidak dicicil bulanan), sehingga beban bunga harian dihitung konstan atas penarikan pokok.`;
+      } else if (d.days <= 30) {
+        elements.dailyHeadToHeadNote.innerHTML = `ℹ️ <strong>Catatan Bulan ke-1 (Hari 1–30):</strong> Pada 30 hari pertama (sebelum cicilan bulan ke-1 dibayarkan), baki debet ketiga metode masih sama-sama 100% utuh (${FinanceMath.formatRupiah(d.principal)}). Geser durasi ke <strong>90, 180, atau 360 hari</strong> untuk melihat penurunan drastis bunga Efektif & Anuitas!`;
+      } else {
+        elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Analisis Penghematan (Hari ke-${d.days}):</strong> Karena pokok pinjaman dicicil tiap bulan, baki debet Efektif & Anuitas terus menyusut. Anda <strong>MENGHEMAT ${FinanceMath.formatRupiah(savings)}</strong> dengan Bunga Efektif dibanding Bunga Flat!`;
+      }
+    }
+  }
+
   // Render Day-by-Day Schedule Table
   if (elements.tableDailyScheduleBody && d.dailySchedule) {
-    elements.dailyTableCountLabel.textContent = `Menampilkan ${d.dailySchedule.length} hari proyeksi (${state.dailyMethod})`;
+    elements.dailyTableCountLabel.textContent = `Menampilkan ${d.dailySchedule.length} hari proyeksi (${activeMethod})`;
     let scheduleHtml = '';
     d.dailySchedule.forEach(item => {
       scheduleHtml += `
@@ -633,6 +770,26 @@ function setupEventListeners() {
     state.dayCountConvention = e.target.value;
     recalculateAll();
   });
+
+  // Facility Type Buttons (Amortizing vs Rekening Koran)
+  if (elements.dailyFacilityButtons) {
+    elements.dailyFacilityButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.dailyFacilityType = btn.getAttribute('data-facility');
+        recalculateAll();
+      });
+    });
+  }
+
+  // Facility Type Buttons (Amortizing vs Rekening Koran)
+  if (elements.dailyFacilityButtons) {
+    elements.dailyFacilityButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.dailyFacilityType = btn.getAttribute('data-facility');
+        recalculateAll();
+      });
+    });
+  }
 
   // Daily Method Buttons
   elements.dailyMethodButtons.forEach(btn => {

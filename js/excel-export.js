@@ -317,13 +317,21 @@ export const ExcelExport = {
     };
 
     // =============================================================
-    // HELPER TABEL BUNGA HARIAN LENGKAP (DAY 1 s.d. DAY N)
+    // HELPER TABEL BUNGA HARIAN LENGKAP DENGAN METODE AKURAT
     // =============================================================
     const addDailyWorksheet = (sheetName, methodType, headerColor = 'FF059669') => {
       const ws = wb.addWorksheet(sheetName, { views: [{ showGridLines: true }] });
       const basis = dailyData.basisDays;
-      const rDecimal = params.rateAnnual / 100;
       const daysCount = Math.max(30, Math.min(params.nMonths * 30, dailyData.days || 60));
+
+      // Ambil simulasi harian akurat untuk metode ini dari comparison
+      const methodMap = {
+        'EFEKTIF': dailyData.comparison ? dailyData.comparison.effective : null,
+        'FLAT': dailyData.comparison ? dailyData.comparison.flat : null,
+        'ANUITAS': dailyData.comparison ? dailyData.comparison.annuity : null
+      };
+      const methodSim = methodMap[methodType] || dailyData;
+      const scheduleRows = methodSim.dailySchedule || [];
 
       ws.mergeCells('A1:G1');
       const h1 = ws.getCell('A1');
@@ -332,12 +340,12 @@ export const ExcelExport = {
       ws.getRow(1).height = 28;
 
       const methodDesc = methodType === 'EFEKTIF' 
-        ? 'Standar Fasilitas Rekening Koran (PRK) / Sliding Rate'
+        ? 'Baki Debet Menurun Sesuai Angsuran Pokok Rata (⭐ Paling Hemat)'
         : methodType === 'FLAT' 
-          ? 'Beban Bunga Tetap Proporsional atas Pokok Awal' 
-          : 'Bunga Berjalan atas Baki Debet Bulan Berjalan (KPR)';
+          ? 'Beban Bunga Tetap Dihitung dari 100% Plafon Awal P (⚠️ Paling Boros)' 
+          : 'Baki Debet Menurun Sesuai Kurva Angsuran Anuitas Tetap (KPR)';
 
-      ws.getCell('A2').value = `Plafon: Rp ${params.principal.toLocaleString('id-ID')} | Rate: ${params.rateAnnual}% p.a. | Basis: ${params.dayCountConvention} (${basis} Hari/Thn) | Skema: ${methodDesc}`;
+      ws.getCell('A2').value = `Plafon: Rp ${params.principal.toLocaleString('id-ID')} | Rate: ${params.rateAnnual}% p.a. | Basis: ${params.dayCountConvention} (${basis} Hari/Thn) | Karakteristik: ${methodDesc}`;
       ws.getCell('A2').font = { name: 'Calibri', italic: true, size: 9, color: { argb: 'FF64748B' } };
 
       const headRow = ws.getRow(4);
@@ -353,30 +361,18 @@ export const ExcelExport = {
       this.styleHeaderRow(headRow, headerColor);
 
       let rNum = 5;
-      let cumInterest = 0;
-      const start = new Date(params.startDate);
-      const currentPrincipal = params.principal;
-      const dailyRate = rDecimal / basis;
-      const dailyInterest = currentPrincipal * dailyRate;
-      const penaltyPercent = dailyData.penaltyPercent || 0;
-      const penaltyFee = currentPrincipal * (penaltyPercent / 100);
+      // scheduleRows sudah diambil dari methodSim
 
-      for (let d = 1; d <= daysCount; d++) {
-        const currentDate = new Date(start);
-        currentDate.setDate(currentDate.getDate() + d);
-
-        cumInterest += dailyInterest;
-        const totalPayoff = currentPrincipal + cumInterest + penaltyFee;
-
+      scheduleRows.forEach((item) => {
         const row = ws.getRow(rNum);
         row.values = [
-          d,
-          currentDate.toISOString().split('T')[0],
-          Math.round(currentPrincipal),
-          dailyRate,
-          Math.round(dailyInterest),
-          Math.round(cumInterest),
-          Math.round(totalPayoff)
+          item.day,
+          item.date,
+          Math.round(item.balance),
+          item.dailyRatePercent / 100,
+          Math.round(item.dailyInterest),
+          Math.round(item.accruedInterest),
+          Math.round(item.payoff)
         ];
 
         this.styleDataCell(row.getCell(1), false, false, false, 'center');
@@ -388,18 +384,20 @@ export const ExcelExport = {
         this.styleDataCell(row.getCell(7), false, true, false, 'right');
         row.getCell(7).font = { name: 'Calibri', size: 10, bold: true };
         rNum++;
-      }
+      });
 
       // Baris Total Akumulasi
+      const lastItem = scheduleRows[scheduleRows.length - 1];
       const totRow = ws.getRow(rNum);
-      totRow.getCell(1).value = `TOTAL HARI KE-${daysCount}`;
+      totRow.getCell(1).value = `POSISI HARI KE-${lastItem ? lastItem.day : daysCount}`;
       totRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-      totRow.getCell(5).value = { formula: `SUM(E5:E${rNum - 1})` };
-      totRow.getCell(6).value = { formula: `E${rNum - 1} * ${daysCount}` };
-      totRow.getCell(7).value = Math.round(currentPrincipal + cumInterest + penaltyFee);
+      totRow.getCell(3).value = lastItem ? Math.round(lastItem.balance) : 0;
+      totRow.getCell(5).value = lastItem ? Math.round(lastItem.dailyInterest) : 0;
+      totRow.getCell(6).value = lastItem ? Math.round(lastItem.accruedInterest) : 0;
+      totRow.getCell(7).value = lastItem ? Math.round(lastItem.payoff) : 0;
 
       for (let c = 1; c <= 7; c++) {
-        if (c === 5 || c === 6 || c === 7) {
+        if (c === 3 || c === 5 || c === 6 || c === 7) {
           totRow.getCell(c).numFmt = '"Rp "#,##0;("Rp "#,##0);"-"';
         }
       }

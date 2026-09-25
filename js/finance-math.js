@@ -229,40 +229,108 @@ export const FinanceMath = {
     };
   },
 
-  calculateDailyInterest(P, rAnnual, days, dayCountConvention = 'ACTUAL_360', penaltyPercent = 0, method = 'EFEKTIF', startDate = new Date()) {
+  calculateDailyInterest(P, rAnnual, days, dayCountConvention = 'ACTUAL_360', penaltyPercent = 0, method = 'EFEKTIF', startDate = new Date(), nMonths = 12, facilityType = 'AMORTIZING') {
     let basis = 360;
     if (dayCountConvention === 'ACTUAL_365') basis = 365;
     else if (dayCountConvention === '30_360') basis = 360;
 
     const rDecimal = rAnnual / 100;
     const dailyRate = rDecimal / basis;
-    const dailyInterestAmount = P * dailyRate;
-    const totalAccruedInterest = dailyInterestAmount * days;
-    const penaltyFee = P * (penaltyPercent / 100);
-    const totalEarlyPayoff = P + totalAccruedInterest + penaltyFee;
 
-    // Generate day-by-day projection list for UI & Excel
-    const dailySchedule = [];
-    let runningInterest = 0;
+    // Hitung amortisasi bulanan 3 metode sebagai referensi baki debet
+    const flatCalc = this.calculateFlat(P, rAnnual, nMonths, startDate);
+    const effCalc = this.calculateEffective(P, rAnnual, nMonths, startDate);
+    const annCalc = this.calculateAnnuity(P, rAnnual, nMonths, startDate);
+
+    // Jadwal tanggal jatuh tempo per bulan
     const sDate = new Date(startDate);
-
-    for (let d = 1; d <= days; d++) {
-      const curDate = new Date(sDate);
-      curDate.setDate(curDate.getDate() + d);
-      const interestToday = dailyInterestAmount;
-      runningInterest += interestToday;
-      const penaltyToday = P * (penaltyPercent / 100);
-
-      dailySchedule.push({
-        day: d,
-        date: curDate.toISOString().split('T')[0],
-        balance: P,
-        dailyRatePercent: dailyRate * 100,
-        dailyInterest: interestToday,
-        accruedInterest: runningInterest,
-        payoff: P + runningInterest + penaltyToday
-      });
+    const dueDates = [];
+    for (let m = 1; m <= nMonths; m++) {
+      const dDate = new Date(sDate);
+      dDate.setMonth(dDate.getMonth() + m);
+      dueDates.push(dDate);
     }
+
+    // Fungsi simulasi harian untuk satu metode spesifik
+    const simulateSingle = (targetMethod) => {
+      let sched = effCalc.schedule;
+      if (targetMethod === 'FLAT') sched = flatCalc.schedule;
+      else if (targetMethod === 'ANUITAS') sched = annCalc.schedule;
+
+      let cumInterest = 0;
+      let curBalance = P;
+      let curDailyInterest = 0;
+      const dailySchedule = [];
+      const maxTableDays = Math.min(days, 365);
+      const daysPerMonth = basis / 12; // 30 hari pada basis 360, 30.4167 pada basis 365
+      const maxTenorDays = Math.round(nMonths * daysPerMonth);
+
+      for (let d = 1; d <= days; d++) {
+        const curDate = new Date(sDate);
+        curDate.setDate(curDate.getDate() + d);
+
+        let principalForInterest = P;
+        if (facilityType === 'AMORTIZING') {
+          if (d > maxTenorDays) {
+            // Pinjaman sudah mencapai jatuh tempo penuh (lunas)
+            const lastIdx = nMonths - 1;
+            curBalance = 0;
+            curDailyInterest = (targetMethod === 'FLAT' ? P : sched[lastIdx].initialBalance) * dailyRate;
+            // Bunga tidak bertambah lagi setelah tenor selesai
+          } else {
+            const mIdx = Math.min(nMonths - 1, Math.floor((d - 1) / daysPerMonth));
+            curBalance = sched[mIdx].initialBalance;
+            // Bunga Flat: bank menagih bunga dari 100% plafon awal (P)
+            // Bunga Efektif / Anuitas: bank menagih bunga dari sisa baki debet bulan berjalan
+            principalForInterest = targetMethod === 'FLAT' ? P : curBalance;
+            curDailyInterest = principalForInterest * dailyRate;
+            cumInterest += curDailyInterest;
+          }
+        } else {
+          // Fasilitas Rekening Koran (PRK) / Non-Amortisasi: Pokok konstan
+          curBalance = P;
+          principalForInterest = P;
+          curDailyInterest = P * dailyRate;
+          cumInterest += curDailyInterest;
+        }
+
+        if (d <= maxTableDays) {
+          const penaltyToday = curBalance * (penaltyPercent / 100);
+          dailySchedule.push({
+            day: d,
+            date: curDate.toISOString().split('T')[0],
+            balance: curBalance,
+            dailyRatePercent: dailyRate * 100,
+            dailyInterest: curDailyInterest,
+            accruedInterest: cumInterest,
+            payoff: curBalance + curDailyInterest + penaltyToday
+          });
+        }
+      }
+
+      const penaltyFee = curBalance * (penaltyPercent / 100);
+      const totalEarlyPayoff = curBalance + curDailyInterest + penaltyFee;
+
+      return {
+        method: targetMethod,
+        dailyRatePercent: dailyRate * 100,
+        dailyInterestAmount: curDailyInterest,
+        totalAccruedInterest: cumInterest,
+        remainingBalance: curBalance,
+        penaltyPercent,
+        penaltyFee,
+        totalEarlyPayoff,
+        dailySchedule
+      };
+    };
+
+    const flatRes = simulateSingle('FLAT');
+    const effRes = simulateSingle('EFEKTIF');
+    const annRes = simulateSingle('ANUITAS');
+
+    let activeRes = effRes;
+    if (method === 'FLAT') activeRes = flatRes;
+    else if (method === 'ANUITAS') activeRes = annRes;
 
     return {
       principal: P,
@@ -271,13 +339,23 @@ export const FinanceMath = {
       convention: dayCountConvention,
       basisDays: basis,
       method,
-      dailyRatePercent: dailyRate * 100,
-      dailyInterestAmount,
-      totalAccruedInterest,
+      nMonths,
+      facilityType,
+      dailyRatePercent: activeRes.dailyRatePercent,
+      dailyInterestAmount: activeRes.dailyInterestAmount,
+      totalAccruedInterest: activeRes.totalAccruedInterest,
+      remainingBalance: activeRes.remainingBalance,
       penaltyPercent,
-      penaltyFee,
-      totalEarlyPayoff,
-      dailySchedule
+      penaltyFee: activeRes.penaltyFee,
+      totalEarlyPayoff: activeRes.totalEarlyPayoff,
+      dailySchedule: activeRes.dailySchedule,
+      comparison: {
+        flat: flatRes,
+        effective: effRes,
+        annuity: annRes,
+        savingsVsFlat: flatRes.totalAccruedInterest - effRes.totalAccruedInterest,
+        savingsVsAnnuity: annRes.totalAccruedInterest - effRes.totalAccruedInterest
+      }
     };
   },
 
