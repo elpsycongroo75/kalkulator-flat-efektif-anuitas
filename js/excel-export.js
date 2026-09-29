@@ -412,15 +412,42 @@ export const ExcelExport = {
       data.schedule.forEach((item, idx) => {
         const row = ws.getRow(rNum);
         row.height = 20;
-        row.values = [
-          item.month,
-          item.dueDate,
-          Math.round(item.initialBalance),
-          Math.round(item.principal),
-          Math.round(item.interest),
-          Math.round(item.totalInstallment),
-          Math.round(item.remainingBalance)
-        ];
+
+        // Baki debet awal: baris 5 = pokok awal, baris berikutnya mengambil Baki Debet Akhir bulan sebelumnya (=G{r-1})
+        const initialBalVal = idx === 0 
+          ? Math.round(item.initialBalance) 
+          : { formula: `G${rNum - 1}`, result: Math.round(item.initialBalance) };
+
+        // Angsuran pokok & bunga dengan rumus Excel aktif
+        let principalFormulaVal = Math.round(item.principal);
+        let interestFormulaVal = Math.round(item.interest);
+
+        if (data.type === 'FLAT') {
+          principalFormulaVal = { formula: `ROUND($C$5/${params.nMonths}, 0)`, result: Math.round(item.principal) };
+          interestFormulaVal = { formula: `ROUND($C$5*(${data.rateAnnual}/100)/12, 0)`, result: Math.round(item.interest) };
+        } else if (data.type === 'EFEKTIF') {
+          if (idx === data.schedule.length - 1) {
+            principalFormulaVal = { formula: `C${rNum}`, result: Math.round(item.principal) };
+          } else {
+            principalFormulaVal = { formula: `ROUND($C$5/${params.nMonths}, 0)`, result: Math.round(item.principal) };
+          }
+          interestFormulaVal = { formula: `ROUND(C${rNum}*(${data.rateAnnual}/100)/12, 0)`, result: Math.round(item.interest) };
+        } else if (data.type === 'ANUITAS') {
+          principalFormulaVal = { formula: `F${rNum}-E${rNum}`, result: Math.round(item.principal) };
+          interestFormulaVal = { formula: `ROUND(C${rNum}*(${data.rateAnnual}/100)/12, 0)`, result: Math.round(item.interest) };
+        }
+
+        const installmentFormulaVal = { formula: `D${rNum}+E${rNum}`, result: Math.round(item.totalInstallment) };
+        const remainingBalFormulaVal = { formula: `MAX(0, C${rNum}-D${rNum})`, result: Math.round(item.remainingBalance) };
+
+        row.getCell(1).value = item.month;
+        row.getCell(2).value = item.dueDate;
+        row.getCell(3).value = initialBalVal;
+        row.getCell(4).value = principalFormulaVal;
+        row.getCell(5).value = interestFormulaVal;
+        row.getCell(6).value = installmentFormulaVal;
+        row.getCell(7).value = remainingBalFormulaVal;
+
         const isEven = idx % 2 === 1;
 
         this.styleDataCell(row.getCell(1), { align: 'center', bold: true, isEvenRow: isEven });
@@ -519,15 +546,32 @@ export const ExcelExport = {
       scheduleRows.forEach((item, idx) => {
         const row = ws.getRow(rNum);
         row.height = 20;
-        row.values = [
-          item.day,
-          item.date,
-          Math.round(item.balance),
-          item.dailyRatePercent / 100,
-          Math.round(item.dailyInterest),
-          Math.round(item.accruedInterest),
-          Math.round(item.payoff)
-        ];
+
+        // Bunga Harian (Kolom E): =ROUND(C{r}*D{r}, 0)
+        const dailyInterestFormulaVal = {
+          formula: `ROUND(C${rNum}*D${rNum}, 0)`,
+          result: Math.round(item.dailyInterest)
+        };
+
+        // Akumulasi Bunga (Kolom F): Hari 1 = E5, Hari berikutnya = F{r-1}+E{r}
+        const accruedFormulaVal = idx === 0
+          ? { formula: `E5`, result: Math.round(item.accruedInterest) }
+          : { formula: `F${rNum - 1}+E${rNum}`, result: Math.round(item.accruedInterest) };
+
+        // Total Pelunasan (Kolom G): =C{r}+E{r}
+        const payoffFormulaVal = {
+          formula: `C${rNum}+E${rNum}`,
+          result: Math.round(item.payoff)
+        };
+
+        row.getCell(1).value = item.day;
+        row.getCell(2).value = item.date;
+        row.getCell(3).value = Math.round(item.balance);
+        row.getCell(4).value = item.dailyRatePercent / 100;
+        row.getCell(5).value = dailyInterestFormulaVal;
+        row.getCell(6).value = accruedFormulaVal;
+        row.getCell(7).value = payoffFormulaVal;
+
         const isEven = idx % 2 === 1;
 
         this.styleDataCell(row.getCell(1), { align: 'center', bold: true, isEvenRow: isEven });
@@ -540,19 +584,19 @@ export const ExcelExport = {
         rNum++;
       });
 
-      // Baris Total Akumulasi Akhir
+      // Baris Total Akumulasi Akhir dengan Rumus Aktif
       const lastItem = scheduleRows[scheduleRows.length - 1];
       const totRow = ws.getRow(rNum);
       totRow.getCell(1).value = 'AKHIR';
       totRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
       totRow.getCell(2).value = `Hari ke-${lastItem ? lastItem.day : 0}`;
       totRow.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
-      totRow.getCell(3).value = lastItem ? Math.round(lastItem.balance) : 0;
-      totRow.getCell(4).value = lastItem ? lastItem.dailyRatePercent / 100 : 0;
+      totRow.getCell(3).value = lastItem ? { formula: `C${rNum - 1}`, result: Math.round(lastItem.balance) } : 0;
+      totRow.getCell(4).value = lastItem ? { formula: `D${rNum - 1}`, result: lastItem.dailyRatePercent / 100 } : 0;
       totRow.getCell(4).numFmt = '0.000000%';
-      totRow.getCell(5).value = { formula: `SUM(E5:E${rNum - 1})` };
-      totRow.getCell(6).value = lastItem ? Math.round(lastItem.accruedInterest) : 0;
-      totRow.getCell(7).value = lastItem ? Math.round(lastItem.payoff) : 0;
+      totRow.getCell(5).value = { formula: `SUM(E5:E${rNum - 1})`, result: lastItem ? Math.round(methodSim.totalAccruedInterest) : 0 };
+      totRow.getCell(6).value = { formula: `F${rNum - 1}`, result: lastItem ? Math.round(lastItem.accruedInterest) : 0 };
+      totRow.getCell(7).value = { formula: `G${rNum - 1}`, result: lastItem ? Math.round(lastItem.payoff) : 0 };
 
       for (let c = 3; c <= 7; c++) {
         if (c !== 4) {

@@ -41,18 +41,37 @@ async function testExport() {
   const wsAnn = wbAll.getWorksheet('4. Bunga Harian - Anuitas');
 
   // Row 364 is Day 360 (since data starts at row 5: 5 + 359 = 364)
-  const effDay360Accrued = wsEff.getRow(364).getCell(6).value;
-  const flatDay360Accrued = wsFlat.getRow(364).getCell(6).value;
-  const annDay360Accrued = wsAnn.getRow(364).getCell(6).value;
+  const effCell = wsEff.getRow(364).getCell(6).value;
+  const flatCell = wsFlat.getRow(364).getCell(6).value;
+  const annCell = wsAnn.getRow(364).getCell(6).value;
 
-  console.log(`  -> Excel Sheet Daily Efektif (Day 360 Accrued): Rp ${effDay360Accrued.toLocaleString('id-ID')}`);
-  console.log(`  -> Excel Sheet Daily Anuitas (Day 360 Accrued): Rp ${annDay360Accrued.toLocaleString('id-ID')}`);
-  console.log(`  -> Excel Sheet Daily Flat    (Day 360 Accrued): Rp ${flatDay360Accrued.toLocaleString('id-ID')}`);
+  const effResult = effCell.result !== undefined ? effCell.result : effCell;
+  const flatResult = flatCell.result !== undefined ? flatCell.result : flatCell;
+  const annResult = annCell.result !== undefined ? annCell.result : annCell;
 
-  console.assert(effDay360Accrued === 3250000, `Expected Efektif 3,250,000, got ${effDay360Accrued}`);
-  console.assert(flatDay360Accrued === 6000000, `Expected Flat 6,000,000, got ${flatDay360Accrued}`);
-  console.assert(annDay360Accrued === 3279716, `Expected Anuitas 3,279,716, got ${annDay360Accrued}`);
-  console.log("✓ Verified: Excel Daily Worksheets have distinct, accurate financial values!");
+  console.log(`  -> Excel Sheet Daily Efektif (Day 360 Accrued): Rp ${effResult.toLocaleString('id-ID')} (Formula: =${effCell.formula})`);
+  console.log(`  -> Excel Sheet Daily Anuitas (Day 360 Accrued): Rp ${annResult.toLocaleString('id-ID')} (Formula: =${annCell.formula})`);
+  console.log(`  -> Excel Sheet Daily Flat    (Day 360 Accrued): Rp ${flatResult.toLocaleString('id-ID')} (Formula: =${flatCell.formula})`);
+
+  console.assert(effResult === 3250000, `Expected Efektif 3,250,000, got ${effResult}`);
+  console.assert(flatResult === 6000000, `Expected Flat 6,000,000, got ${flatResult}`);
+  console.assert(annResult === 3279716, `Expected Anuitas 3,279,716, got ${annResult}`);
+
+  // Assert active formula in cell F364 and E364
+  console.assert(effCell.formula === 'F363+E364', `Expected formula F363+E364, got ${effCell.formula}`);
+  console.assert(wsEff.getRow(364).getCell(5).value.formula === 'ROUND(C364*D364, 0)', 'Expected daily interest formula ROUND(C364*D364, 0)');
+  console.assert(wsEff.getRow(364).getCell(7).value.formula === 'C364+E364', 'Expected payoff formula C364+E364');
+  console.log("✓ Verified: Active Excel formulas confirmed on daily rows (Fx: =ROUND(C*D), =F{r-1}+E{r}, =C+E)!");
+
+  // Verify Schedule sheet formulas (pointing to previous month ending balance)
+  const wsSchedAnn = wbAll.getWorksheet('5. Jadwal Anuitas');
+  if (wsSchedAnn) {
+    const row6BalAwal = wsSchedAnn.getRow(6).getCell(3).value;
+    console.assert(row6BalAwal.formula === 'G5', `Expected Month 2 Initial Balance to be =G5, got ${row6BalAwal.formula}`);
+    console.log("✓ Verified: Active Excel formulas confirmed on monthly schedule sheets (Initial Bal Month 2 = =G5)!");
+  }
+
+  console.log("✓ Verified: Excel Daily Worksheets have distinct, accurate financial values and dynamic formulas!");
   // Verify Column A width is compact (not blown up by merged title strings)
   console.assert(wsEff.getColumn(1).width === 12, `Expected Daily Col A width 12, got ${wsEff.getColumn(1).width}`);
   console.assert(wsSummary_check.getColumn(1).width === 28, `Expected Summary Col A width 28, got ${wsSummary_check.getColumn(1).width}`);
