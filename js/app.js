@@ -512,7 +512,7 @@ function updateDailyUI() {
     if (isAmortizing) {
       elements.facilityDescText.textContent = `Kredit angsuran berjangka ${state.nMonths} bulan (baki debet berkurang tiap bulan)`;
     } else if (isSyariah) {
-      elements.facilityDescText.textContent = 'Pembiayaan Syariah / Promes Berulang (roll-over rekening baru, bagi hasil harian)';
+      elements.facilityDescText.textContent = 'Pinjaman Tetap Berjangka (PTB) / Promes Syariah (bayar bagi hasil bulanan doang, pokok di akhir)';
     } else {
       elements.facilityDescText.textContent = 'Fasilitas Rekening Koran (PRK) / Cerukan (pokok konstan, bunga harian efektif)';
     }
@@ -598,7 +598,7 @@ function updateDailyUI() {
 
       if (elements.dailyCompSavingsTag) {
         if (isSyariah) {
-          elements.dailyCompSavingsTag.textContent = `🌙 Mode Promes Syariah: Saldo Pokok Aktif Berjalan (Diperpanjang)`;
+          elements.dailyCompSavingsTag.textContent = `🌙 Mode Pinjaman Tetap Berjangka (PTB): Bayar Bagi Hasil Bulanan, Pokok di Akhir`;
         } else {
           elements.dailyCompSavingsTag.textContent = effSavings > 0
             ? `💡 Beralih ke Kredit Berangsur Efektif Hemat ${FinanceMath.formatRupiah(effSavings)}!`
@@ -610,7 +610,7 @@ function updateDailyUI() {
         <tr class="${isSyariah ? 'bg-teal-950/50 text-teal-200' : 'bg-blue-950/50 text-blue-200'} font-bold border-b border-slate-700">
           <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold text-white">
             <span class="w-2 h-2 rounded-full ${isSyariah ? 'bg-teal-400' : 'bg-blue-400'}"></span>
-            ${isSyariah ? 'Pembiayaan Syariah / Promes Berulang' : 'Rekening Koran (PRK) - Pilihan Anda'}
+            ${isSyariah ? 'Pinjaman Tetap Berjangka (PTB) / Promes Syariah' : 'Rekening Koran (PRK) - Pilihan Anda'}
           </td>
           <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(d.dailyInterestAmount)}</td>
           <td class="px-3 py-2.5 text-right font-extrabold ${isSyariah ? 'text-teal-300' : 'text-blue-300'}">${FinanceMath.formatRupiah(nonAmortInterest)}</td>
@@ -618,7 +618,7 @@ function updateDailyUI() {
           <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(d.totalEarlyPayoff)}</td>
           <td class="px-3 py-2.5 text-center">
             <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isSyariah ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">
-              ${isSyariah ? '🌙 Promes Diperpanjang' : '⚡ Pokok Utuh (PRK)'}
+              ${isSyariah ? '🌙 Bayar Margin Saja (Bullet)' : '⚡ Pokok Utuh (PRK)'}
             </span>
           </td>
         </tr>
@@ -658,7 +658,7 @@ function updateDailyUI() {
 
       if (elements.dailyHeadToHeadNote) {
         if (isSyariah) {
-          elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mengapa Pokok & Bagi Hasil Promes Tetap Aktif?</strong> Pada pembiayaan syariah atau kredit promes yang diperpanjang (revolving/rek baru), pokok tidak lunas di tengah tahun melainkan di-roll over secara berkelanjutan. Bagi hasil dibayarkan setiap bulan berdasarkan akrual harian riil (misal 30 hari = ${FinanceMath.formatRupiah(d.dailyInterestAmount * 30)}). Jika nasabah ingin memperkecil bagi hasil, pokok pinjaman perlu dicicil bulanan (skema Berangsur/Amortisasi).`;
+          elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Sistem Pinjaman Tetap Berjangka / Promes Syariah (Mirip PRK):</strong> Nasabah <strong>hanya membayar kewajiban bagi hasil / margin bulanan</strong> yang dihitung akrual harian (misal 30 hari = ${FinanceMath.formatRupiah(d.dailyInterestAmount * 30)}). Pokok utang ${FinanceMath.formatRupiah(d.principal)} tetap 100% utuh sampai akhir masa tenor promes untuk dilunasi sekaligus (bullet repayment) atau diperpanjang dengan nomor rekening promes baru.`;
         } else {
           elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mengapa Bunga PRK dan Flat sama-sama Rp ${FinanceMath.formatNumber(nonAmortInterest)}?</strong> Karena pada PRK nasabah <strong>tidak mencicil pokok utang setiap bulan</strong> (saldo utang tetap 100% utuh ${FinanceMath.formatRupiah(d.principal)} selama ${d.days} hari). Bunga Efektif baru bisa menghemat pengeluaran (menjadi ${FinanceMath.formatRupiah(amortEff ? amortEff.totalAccruedInterest : 0)}) jika nasabah mengambil fasilitas <strong>Pinjaman Berangsur</strong> di mana pokok dicicil tiap bulan!`;
         }
