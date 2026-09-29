@@ -120,6 +120,10 @@ const elements = {
   facilityDescText: document.getElementById('facility-desc-text'),
   dailyMethodContainer: document.getElementById('daily-method-container'),
   prkNoticeCard: document.getElementById('prk-notice-card'),
+  syariahNoticeCard: document.getElementById('syariah-notice-card'),
+  syariahDailyDisplay: document.getElementById('syariah-daily-display'),
+  syariahM30Display: document.getElementById('syariah-m30-display'),
+  syariahM31Display: document.getElementById('syariah-m31-display'),
   btnSwitchToAmortizing: document.getElementById('btn-switch-to-amortizing'),
   btnSyncTenorDays: document.getElementById('btn-sync-tenor-days'),
   dailyMethodButtons: document.querySelectorAll('.daily-method-btn'),
@@ -462,14 +466,27 @@ function updateDailyUI() {
   const activeMethod = state.dailyMethod;
   const isAmortizing = state.dailyFacilityType === 'AMORTIZING';
 
-  // Toggle Visibility Method Buttons vs PRK Notice Card
-  if (elements.dailyMethodContainer && elements.prkNoticeCard) {
+  // Toggle Visibility: Method Buttons vs PRK Notice Card vs Syariah Notice Card
+  const isSyariah = state.dailyFacilityType === 'SYARIAH_PROMES';
+  const isPrk = state.dailyFacilityType === 'REKENING_KORAN';
+
+  if (elements.dailyMethodContainer && elements.prkNoticeCard && elements.syariahNoticeCard) {
     if (isAmortizing) {
       elements.dailyMethodContainer.classList.remove('hidden');
       elements.prkNoticeCard.classList.add('hidden');
+      elements.syariahNoticeCard.classList.add('hidden');
+    } else if (isSyariah) {
+      elements.dailyMethodContainer.classList.add('hidden');
+      elements.prkNoticeCard.classList.add('hidden');
+      elements.syariahNoticeCard.classList.remove('hidden');
+
+      if (elements.syariahDailyDisplay) elements.syariahDailyDisplay.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount) + ' /hari';
+      if (elements.syariahM30Display) elements.syariahM30Display.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount * 30) + ' /bln';
+      if (elements.syariahM31Display) elements.syariahM31Display.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount * 31) + ' /bln';
     } else {
       elements.dailyMethodContainer.classList.add('hidden');
       elements.prkNoticeCard.classList.remove('hidden');
+      elements.syariahNoticeCard.classList.add('hidden');
     }
   }
 
@@ -492,15 +509,21 @@ function updateDailyUI() {
   }
 
   if (elements.facilityDescText) {
-    elements.facilityDescText.textContent = isAmortizing 
-      ? `Kredit angsuran berjangka ${state.nMonths} bulan (baki debet berkurang tiap bulan)` 
-      : 'Fasilitas Rekening Koran (PRK) / Cerukan (pokok konstan, bunga harian efektif)';
+    if (isAmortizing) {
+      elements.facilityDescText.textContent = `Kredit angsuran berjangka ${state.nMonths} bulan (baki debet berkurang tiap bulan)`;
+    } else if (isSyariah) {
+      elements.facilityDescText.textContent = 'Pembiayaan Syariah / Promes Berulang (roll-over rekening baru, bagi hasil harian)';
+    } else {
+      elements.facilityDescText.textContent = 'Fasilitas Rekening Koran (PRK) / Cerukan (pokok konstan, bunga harian efektif)';
+    }
   }
 
   // Suku bunga per hari
   elements.resDailyRate.textContent = d.dailyRatePercent.toFixed(6) + '% /hari';
   if (elements.resDailyRateSub) {
-    if (!isAmortizing) {
+    if (isSyariah) {
+      elements.resDailyRateSub.textContent = `Nisbah ekuivalen: ${state.rateAnnual}% p.a. / ${d.basisDays} hari`;
+    } else if (isPrk) {
       elements.resDailyRateSub.textContent = `Rate acuan: ${state.rateAnnual}% p.a. / ${d.basisDays} hari`;
     } else {
       elements.resDailyRateSub.textContent = activeMethod === 'FLAT' 
@@ -512,32 +535,38 @@ function updateDailyUI() {
   // Bunga hari ini
   elements.resDailyAmount.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount) + ' /hari';
   if (elements.resDailyAmountSub) {
-    if (!isAmortizing) {
-      elements.resDailyAmountSub.textContent = `Beban 24 jam saldo Rp ${FinanceMath.formatNumber(d.principal)}`;
+    if (isSyariah) {
+      elements.resDailyAmountSub.textContent = `Bagi hasil 24 jam pokok aktif ${FinanceMath.formatRupiah(d.principal)}`;
+    } else if (isPrk) {
+      elements.resDailyAmountSub.textContent = `Beban 24 jam saldo penuh Rp ${FinanceMath.formatNumber(d.principal)}`;
     } else {
       elements.resDailyAmountSub.textContent = d.remainingBalance > 0
         ? `Beban hari ke-${d.days} (${activeMethod}) atas sisa pokok ${FinanceMath.formatRupiah(d.remainingBalance)}`
-        : `Pinjaman telah lunas pada hari ke-${d.days}`;
+        : `Pinjaman telah lunas pada hari ke-${state.nMonths * 30} (${state.nMonths} Bulan)`;
     }
   }
 
   // Akumulasi bunga s.d. hari ini
   elements.resDailyAccrued.textContent = FinanceMath.formatRupiah(d.totalAccruedInterest);
-  elements.resDailyAccruedSub.textContent = !isAmortizing
-    ? `Total bunga ${d.days} hari (PRK - Pokok Konstan)`
-    : `Total bunga ${d.days} hari (${activeMethod})`;
+  elements.resDailyAccruedSub.textContent = isSyariah
+    ? `Total bagi hasil ${d.days} hari (Promes Diperpanjang)`
+    : (isPrk
+      ? `Total bunga ${d.days} hari (PRK - Pokok Konstan)`
+      : `Total bunga ${d.days} hari (${activeMethod})`);
 
   // Total pelunasan
   elements.resDailyPayoff.textContent = FinanceMath.formatRupiah(d.totalEarlyPayoff);
   if (elements.resDailyPayoffSub) {
-    elements.resDailyPayoffSub.textContent = `Sisa Pokok (${FinanceMath.formatRupiah(d.remainingBalance)}) + Bunga + Penalti`;
+    elements.resDailyPayoffSub.textContent = `Sisa Pokok (${FinanceMath.formatRupiah(d.remainingBalance)}) + Bunga/Bagi Hasil`;
   }
 
   // Update button label
   if (elements.btnQuickExportDailyText) {
-    elements.btnQuickExportDailyText.textContent = !isAmortizing
-      ? 'Unduh Excel Bunga Harian (PRK)'
-      : `Unduh Excel Bunga Harian (${activeMethod})`;
+    elements.btnQuickExportDailyText.textContent = isSyariah
+      ? 'Unduh Excel Bagi Hasil Harian (Syariah)'
+      : (isPrk
+        ? 'Unduh Excel Bunga Harian (PRK)'
+        : `Unduh Excel Bunga Harian (${activeMethod})`);
   }
 
   // Update Daily Method Buttons Styling
@@ -561,31 +590,35 @@ function updateDailyUI() {
 
   if (elements.dailyHeadToHeadTbody) {
     if (!isAmortizing) {
-      // TABEL KHUSUS PRK: Bandingkan PRK (pokok utuh) vs Kredit Berangsur Efektif vs Kredit Berangsur Flat
-      const prkInterest = d.totalAccruedInterest;
+      // TABEL KHUSUS SYARIAH PROMES & PRK
+      const nonAmortInterest = d.totalAccruedInterest;
       const amortEff = comp.amortizingEff;
       const amortFlat = comp.amortizingFlat;
-      const effSavings = amortEff ? Math.round(prkInterest - amortEff.totalAccruedInterest) : 0;
+      const effSavings = amortEff ? Math.round(nonAmortInterest - amortEff.totalAccruedInterest) : 0;
 
       if (elements.dailyCompSavingsTag) {
-        elements.dailyCompSavingsTag.textContent = effSavings > 0
-          ? `💡 Beralih ke Kredit Berangsur Efektif Hemat ${FinanceMath.formatRupiah(effSavings)}!`
-          : `Mode PRK: Saldo Pokok Tetap Utuh`;
+        if (isSyariah) {
+          elements.dailyCompSavingsTag.textContent = `🌙 Mode Promes Syariah: Saldo Pokok Aktif Berjalan (Diperpanjang)`;
+        } else {
+          elements.dailyCompSavingsTag.textContent = effSavings > 0
+            ? `💡 Beralih ke Kredit Berangsur Efektif Hemat ${FinanceMath.formatRupiah(effSavings)}!`
+            : `Mode PRK: Saldo Pokok Tetap Utuh`;
+        }
       }
 
       elements.dailyHeadToHeadTbody.innerHTML = `
-        <tr class="bg-blue-950/50 text-blue-200 font-bold border-b border-slate-700">
+        <tr class="${isSyariah ? 'bg-teal-950/50 text-teal-200' : 'bg-blue-950/50 text-blue-200'} font-bold border-b border-slate-700">
           <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold text-white">
-            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-            Rekening Koran (PRK) - Pilihan Anda
+            <span class="w-2 h-2 rounded-full ${isSyariah ? 'bg-teal-400' : 'bg-blue-400'}"></span>
+            ${isSyariah ? 'Pembiayaan Syariah / Promes Berulang' : 'Rekening Koran (PRK) - Pilihan Anda'}
           </td>
           <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(d.dailyInterestAmount)}</td>
-          <td class="px-3 py-2.5 text-right font-extrabold text-blue-300">${FinanceMath.formatRupiah(prkInterest)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold ${isSyariah ? 'text-teal-300' : 'text-blue-300'}">${FinanceMath.formatRupiah(nonAmortInterest)}</td>
           <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(d.remainingBalance)}</td>
           <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(d.totalEarlyPayoff)}</td>
           <td class="px-3 py-2.5 text-center">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-              ⚡ Pokok Utuh (PRK)
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isSyariah ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">
+              ${isSyariah ? '🌙 Promes Diperpanjang' : '⚡ Pokok Utuh (PRK)'}
             </span>
           </td>
         </tr>
@@ -593,7 +626,7 @@ function updateDailyUI() {
         <tr class="hover:bg-slate-800/60 border-b border-slate-700">
           <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold text-emerald-300">
             <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            Pinjaman Berangsur Efektif (Jika Dicicil)
+            Pinjaman Berangsur Efektif (Jika Dicicil Pokok)
           </td>
           <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(amortEff.dailyInterestAmount)}</td>
           <td class="px-3 py-2.5 text-right font-extrabold text-emerald-300">${FinanceMath.formatRupiah(amortEff.totalAccruedInterest)}</td>
@@ -624,7 +657,11 @@ function updateDailyUI() {
       `;
 
       if (elements.dailyHeadToHeadNote) {
-        elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mengapa Bunga PRK dan Flat sama-sama Rp ${FinanceMath.formatNumber(prkInterest)}?</strong> Karena pada PRK nasabah <strong>tidak mencicil pokok utang setiap bulan</strong> (saldo utang tetap 100% utuh ${FinanceMath.formatRupiah(d.principal)} selama ${d.days} hari). Bunga Efektif baru bisa menghemat pengeluaran (menjadi ${FinanceMath.formatRupiah(amortEff ? amortEff.totalAccruedInterest : 0)}) jika nasabah mengambil fasilitas <strong>Pinjaman Berangsur</strong> di mana pokok dicicil tiap bulan!`;
+        if (isSyariah) {
+          elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mengapa Pokok & Bagi Hasil Promes Tetap Aktif?</strong> Pada pembiayaan syariah atau kredit promes yang diperpanjang (revolving/rek baru), pokok tidak lunas di tengah tahun melainkan di-roll over secara berkelanjutan. Bagi hasil dibayarkan setiap bulan berdasarkan akrual harian riil (misal 30 hari = ${FinanceMath.formatRupiah(d.dailyInterestAmount * 30)}). Jika nasabah ingin memperkecil bagi hasil, pokok pinjaman perlu dicicil bulanan (skema Berangsur/Amortisasi).`;
+        } else {
+          elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mengapa Bunga PRK dan Flat sama-sama Rp ${FinanceMath.formatNumber(nonAmortInterest)}?</strong> Karena pada PRK nasabah <strong>tidak mencicil pokok utang setiap bulan</strong> (saldo utang tetap 100% utuh ${FinanceMath.formatRupiah(d.principal)} selama ${d.days} hari). Bunga Efektif baru bisa menghemat pengeluaran (menjadi ${FinanceMath.formatRupiah(amortEff ? amortEff.totalAccruedInterest : 0)}) jika nasabah mengambil fasilitas <strong>Pinjaman Berangsur</strong> di mana pokok dicicil tiap bulan!`;
+        }
       }
     } else {
       // TABEL AMORTIZING: Flat vs Efektif vs Anuitas
@@ -898,6 +935,17 @@ function setupEventListeners() {
     recalculateAll();
   });
 
+  // Helper sinkronisasi hari berjalan saat tenor diubah
+  const syncTenorWithDailyDays = (m) => {
+    const tenorDays = m * 30;
+    if (state.dailyFacilityType === 'AMORTIZING') {
+      state.dailyDays = tenorDays;
+      elements.inputDailyDays.value = tenorDays;
+      elements.sliderDailyDays.value = Math.min(365, tenorDays);
+    }
+    elements.sliderDailyDays.max = Math.max(365, tenorDays);
+  };
+
   // Tenor Months, Years & Slider
   elements.inputTenorMonths.addEventListener('input', (e) => {
     let val = parseInt(e.target.value, 10) || 1;
@@ -905,6 +953,7 @@ function setupEventListeners() {
     state.nMonths = val;
     elements.inputTenorYears.value = (val / 12).toFixed(1);
     elements.sliderTenor.value = val;
+    syncTenorWithDailyDays(val);
     state.page = 1;
     recalculateAll();
   });
@@ -916,6 +965,7 @@ function setupEventListeners() {
     state.nMonths = valMonths;
     elements.inputTenorMonths.value = valMonths;
     elements.sliderTenor.value = valMonths;
+    syncTenorWithDailyDays(valMonths);
     state.page = 1;
     recalculateAll();
   });
@@ -925,6 +975,7 @@ function setupEventListeners() {
     state.nMonths = val;
     elements.inputTenorMonths.value = val;
     elements.inputTenorYears.value = (val / 12).toFixed(1);
+    syncTenorWithDailyDays(val);
     state.page = 1;
     recalculateAll();
   });

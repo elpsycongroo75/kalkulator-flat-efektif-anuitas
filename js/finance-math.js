@@ -285,6 +285,13 @@ export const FinanceMath = {
             curDailyInterest = principalForInterest * dailyRate;
             cumInterest += curDailyInterest;
           }
+        } else if (targetFacility === 'SYARIAH_PROMES') {
+          // Pembiayaan Syariah / Promes Berulang: Pokok aktif berjalan (roll-over per promes)
+          // Bagi hasil / margin dihitung akrual harian dari saldo baki debet
+          curBalance = P;
+          principalForInterest = P;
+          curDailyInterest = P * dailyRate;
+          cumInterest += curDailyInterest;
         } else {
           // Fasilitas Rekening Koran (PRK) / Non-Amortisasi: Pokok konstan
           curBalance = P;
@@ -310,6 +317,11 @@ export const FinanceMath = {
       const penaltyFee = curBalance * (penaltyPercent / 100);
       const totalEarlyPayoff = curBalance + curDailyInterest + penaltyFee;
 
+      // Akrual bagi hasil bulanan (standar perbankan syariah / konvensional)
+      const monthly30 = curDailyInterest * 30;
+      const monthly31 = curDailyInterest * 31;
+      const monthly28 = curDailyInterest * 28;
+
       return {
         method: targetMethod,
         facilityType: targetFacility,
@@ -320,6 +332,9 @@ export const FinanceMath = {
         penaltyPercent,
         penaltyFee,
         totalEarlyPayoff,
+        monthly30,
+        monthly31,
+        monthly28,
         dailySchedule
       };
     };
@@ -328,10 +343,11 @@ export const FinanceMath = {
     const effRes = simulateSingle('EFEKTIF');
     const annRes = simulateSingle('ANUITAS');
 
-    // Referensi komparasi edukatif pinjaman berangsur saat mode PRK
-    const amortizingEff = (facilityType === 'REKENING_KORAN') ? simulateSingle('EFEKTIF', 'AMORTIZING') : null;
-    const amortizingFlat = (facilityType === 'REKENING_KORAN') ? simulateSingle('FLAT', 'AMORTIZING') : null;
-    const amortizingAnn = (facilityType === 'REKENING_KORAN') ? simulateSingle('ANUITAS', 'AMORTIZING') : null;
+    // Referensi komparasi edukatif pinjaman berangsur saat mode PRK atau Syariah Promes
+    const isNonAmortizing = (facilityType === 'REKENING_KORAN' || facilityType === 'SYARIAH_PROMES');
+    const amortizingEff = isNonAmortizing ? simulateSingle('EFEKTIF', 'AMORTIZING') : null;
+    const amortizingFlat = isNonAmortizing ? simulateSingle('FLAT', 'AMORTIZING') : null;
+    const amortizingAnn = isNonAmortizing ? simulateSingle('ANUITAS', 'AMORTIZING') : null;
 
     let activeRes = effRes;
     if (method === 'FLAT') activeRes = flatRes;
@@ -353,6 +369,9 @@ export const FinanceMath = {
       penaltyPercent,
       penaltyFee: activeRes.penaltyFee,
       totalEarlyPayoff: activeRes.totalEarlyPayoff,
+      monthly30: activeRes.monthly30,
+      monthly31: activeRes.monthly31,
+      monthly28: activeRes.monthly28,
       dailySchedule: activeRes.dailySchedule,
       comparison: {
         flat: flatRes,

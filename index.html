@@ -714,7 +714,7 @@
             <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Tipe Fasilitas Pinjaman:</label>
             <span class="text-[11px] text-slate-500" id="facility-desc-text">Kredit angsuran dengan amortisasi pokok bulanan</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button type="button" data-facility="AMORTIZING" class="daily-facility-btn active p-3 rounded-xl border text-left flex items-center gap-3 transition bg-blue-50 border-blue-500 text-blue-950 ring-2 ring-blue-500/20">
               <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">📅</span>
               <div>
@@ -722,10 +722,20 @@
                 <div class="text-[11px] text-blue-700">Baki debet berkurang setiap bulan sesuai cicilan pokok</div>
               </div>
             </button>
+            <button type="button" data-facility="SYARIAH_PROMES" class="daily-facility-btn p-3 rounded-xl border text-left flex items-center gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300">
+              <span class="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">🌙</span>
+              <div>
+                <div class="font-bold text-xs flex items-center gap-1">
+                  Pembiayaan Syariah / Promes
+                  <span class="text-[9px] bg-teal-100 text-teal-800 px-1 py-0.2 rounded font-bold">Revolving</span>
+                </div>
+                <div class="text-[11px] text-slate-500">Promes diperpanjang berkala, bagi hasil bulanan dihitung harian</div>
+              </div>
+            </button>
             <button type="button" data-facility="REKENING_KORAN" class="daily-facility-btn p-3 rounded-xl border text-left flex items-center gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300">
               <span class="w-8 h-8 rounded-lg bg-slate-700 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">⚡</span>
               <div>
-                <div class="font-bold text-xs">Pinjaman Rekening Koran (PRK) / Cerukan</div>
+                <div class="font-bold text-xs">Rekening Koran (PRK) / Cerukan</div>
                 <div class="text-[11px] text-slate-500">Saldo pokok konstan, hanya membayar bunga harian atas penarikan</div>
               </div>
             </button>
@@ -788,6 +798,34 @@
               <button type="button" id="btn-switch-to-amortizing" class="text-xs font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-300 px-3 py-1 rounded-lg shadow-sm transition">
                 👉 Beralih ke Pinjaman Berangsur
               </button>
+            </div>
+          </div>
+
+          <!-- Syariah / Promes Dedicated Info Card (Tampil saat SYARIAH_PROMES) -->
+          <div id="syariah-notice-card" class="hidden p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-950 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="font-bold text-xs flex items-center gap-2 text-teal-900">
+                <span class="w-6 h-6 rounded-lg bg-teal-600 text-white flex items-center justify-center text-xs">🌙</span>
+                Pembiayaan Syariah / Promes Berulang: Bagi Hasil Bulanan Dihitung Akrual Harian
+              </div>
+              <span class="text-[10px] bg-teal-200 text-teal-900 px-2 py-0.5 rounded-full font-bold w-fit">Roll-over Promes</span>
+            </div>
+            <p class="text-xs text-teal-800 leading-relaxed">
+              Pada pembiayaan syariah (Musyarakah/Mudharabah) atau kredit modal kerja berbasis promes yang diperpanjang (kurang dari setahun per nomor rekening promes), pokok pembiayaan <strong>tetap aktif berjalan</strong> (tidak mati/lunas di tengah tahun). Pembayaran bagi hasil / margin per bulan <strong>dihitung harian riil (daily accrual)</strong> atas saldo penarikan.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-teal-200/70 text-xs">
+              <div class="bg-white/90 p-2.5 rounded-lg border border-teal-200/80 shadow-2xs">
+                <div class="text-[10px] text-slate-500 font-medium">Bagi Hasil / Hari (Akrual):</div>
+                <div class="font-extrabold text-teal-900 text-sm mt-0.5" id="syariah-daily-display">Rp 0 /hari</div>
+              </div>
+              <div class="bg-white/90 p-2.5 rounded-lg border border-teal-200/80 shadow-2xs">
+                <div class="text-[10px] text-slate-500 font-medium">Bagi Hasil Bulan 30 Hari:</div>
+                <div class="font-extrabold text-teal-900 text-sm mt-0.5" id="syariah-m30-display">Rp 0 /bln</div>
+              </div>
+              <div class="bg-white/90 p-2.5 rounded-lg border border-teal-200/80 shadow-2xs">
+                <div class="text-[10px] text-slate-500 font-medium">Bagi Hasil Bulan 31 Hari:</div>
+                <div class="font-extrabold text-teal-900 text-sm mt-0.5" id="syariah-m31-display">Rp 0 /bln</div>
+              </div>
             </div>
           </div>
         </div>

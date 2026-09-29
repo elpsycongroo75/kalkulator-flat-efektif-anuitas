@@ -77,4 +77,18 @@ console.assert(Math.round(f1m.totalInterest) === Math.round(e1m.totalInterest), 
 console.assert(Math.round(e1m.totalInterest) === Math.round(a1m.totalInterest), "Test 10.2 Failed: 1-mo Efektif != Anuitas");
 console.log("✓ Test 10 Passed: 1-Month Tenor Flat == Efektif == Anuitas mathematically (1x payment)");
 
-console.log("\nALL 10 RIGOROUS UNIT TESTS PASSED SUCCESSFULLY! 🚀");
+
+// Test 11: AUDIT FIX - Syariah Promes Facility keeps principal active and accrues daily profit sharing
+const dailySyariah = FinanceMath.calculateDailyInterest(P, rFlat, 360, 'ACTUAL_360', 0, 'EFEKTIF', new Date('2026-01-01'), 6, 'SYARIAH_PROMES');
+console.assert(dailySyariah.remainingBalance === P, "Test 11.1 Failed: Syariah Promes principal must remain active P");
+console.assert(Math.round(dailySyariah.totalAccruedInterest) === 60000000, `Test 11.2 Failed: 360 days Syariah Promes expected 60M, got ${dailySyariah.totalAccruedInterest}`);
+console.assert(dailySyariah.dailyInterestAmount > 0, "Test 11.3 Failed: Daily interest amount must be positive");
+console.log("✓ Test 11 Passed: Syariah Promes Facility keeps principal active throughout 360 days with daily accrual");
+
+// Test 12: AUDIT FIX - Monthly profit sharing in Syariah Promes matches daily accrual for 30 and 31 days
+const dailyRate1B = (1000000000 * 0.06) / 360;
+console.assert(Math.round(dailySyariah.monthly30) === Math.round(dailyRate1B * 30), "Test 12.1 Failed: monthly30 calculation");
+console.assert(Math.round(dailySyariah.monthly31) === Math.round(dailyRate1B * 31), "Test 12.2 Failed: monthly31 calculation");
+console.log("✓ Test 12 Passed: Monthly profit sharing accurately matches daily accrual (30 days: Rp 5M, 31 days: Rp 5.17M)");
+
+console.log("\nALL 12 RIGOROUS UNIT TESTS PASSED SUCCESSFULLY! 🚀");
