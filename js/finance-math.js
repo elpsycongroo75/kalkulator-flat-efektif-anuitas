@@ -252,7 +252,7 @@ export const FinanceMath = {
     }
 
     // Fungsi simulasi harian untuk satu metode spesifik
-    const simulateSingle = (targetMethod) => {
+    const simulateSingle = (targetMethod, targetFacility = facilityType) => {
       let sched = effCalc.schedule;
       if (targetMethod === 'FLAT') sched = flatCalc.schedule;
       else if (targetMethod === 'ANUITAS') sched = annCalc.schedule;
@@ -270,12 +270,11 @@ export const FinanceMath = {
         curDate.setDate(curDate.getDate() + d);
 
         let principalForInterest = P;
-        if (facilityType === 'AMORTIZING') {
+        if (targetFacility === 'AMORTIZING') {
           if (d > maxTenorDays) {
             // Pinjaman sudah mencapai jatuh tempo penuh (lunas)
-            const lastIdx = nMonths - 1;
             curBalance = 0;
-            curDailyInterest = (targetMethod === 'FLAT' ? P : sched[lastIdx].initialBalance) * dailyRate;
+            curDailyInterest = 0;
             // Bunga tidak bertambah lagi setelah tenor selesai
           } else {
             const mIdx = Math.min(nMonths - 1, Math.floor((d - 1) / daysPerMonth));
@@ -313,6 +312,7 @@ export const FinanceMath = {
 
       return {
         method: targetMethod,
+        facilityType: targetFacility,
         dailyRatePercent: dailyRate * 100,
         dailyInterestAmount: curDailyInterest,
         totalAccruedInterest: cumInterest,
@@ -327,6 +327,11 @@ export const FinanceMath = {
     const flatRes = simulateSingle('FLAT');
     const effRes = simulateSingle('EFEKTIF');
     const annRes = simulateSingle('ANUITAS');
+
+    // Referensi komparasi edukatif pinjaman berangsur saat mode PRK
+    const amortizingEff = (facilityType === 'REKENING_KORAN') ? simulateSingle('EFEKTIF', 'AMORTIZING') : null;
+    const amortizingFlat = (facilityType === 'REKENING_KORAN') ? simulateSingle('FLAT', 'AMORTIZING') : null;
+    const amortizingAnn = (facilityType === 'REKENING_KORAN') ? simulateSingle('ANUITAS', 'AMORTIZING') : null;
 
     let activeRes = effRes;
     if (method === 'FLAT') activeRes = flatRes;
@@ -353,6 +358,9 @@ export const FinanceMath = {
         flat: flatRes,
         effective: effRes,
         annuity: annRes,
+        amortizingEff,
+        amortizingFlat,
+        amortizingAnn,
         savingsVsFlat: flatRes.totalAccruedInterest - effRes.totalAccruedInterest,
         savingsVsAnnuity: annRes.totalAccruedInterest - effRes.totalAccruedInterest
       }

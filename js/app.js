@@ -109,9 +109,19 @@ const elements = {
   currentPageSpan: document.getElementById('current-page-span'),
   totalPagesSpan: document.getElementById('total-pages-span'),
 
+  // Tenor helpers
+  btnTenorChips: document.querySelectorAll('.btn-tenor-chip'),
+  tenor1mAlert: document.getElementById('tenor-1m-alert'),
+  tenor1mVal: document.getElementById('tenor-1m-val'),
+  btnFixTo12m: document.getElementById('btn-fix-to-12m'),
+
   // Daily Simulator
   dailyFacilityButtons: document.querySelectorAll('.daily-facility-btn'),
   facilityDescText: document.getElementById('facility-desc-text'),
+  dailyMethodContainer: document.getElementById('daily-method-container'),
+  prkNoticeCard: document.getElementById('prk-notice-card'),
+  btnSwitchToAmortizing: document.getElementById('btn-switch-to-amortizing'),
+  btnSyncTenorDays: document.getElementById('btn-sync-tenor-days'),
   dailyMethodButtons: document.querySelectorAll('.daily-method-btn'),
   inputDailyDays: document.getElementById('input-daily-days'),
   sliderDailyDays: document.getElementById('slider-daily-days'),
@@ -232,6 +242,18 @@ function updateDesainBViews() {
     elements.cardFlatTotalPay.textContent = FinanceMath.formatRupiah(flat.totalPayment);
     const flatDiff = flat.totalInterest - effective.totalInterest;
     elements.cardFlatDiff.textContent = `+${FinanceMath.formatRupiah(flatDiff)} (Boros)`;
+  }
+
+  // Update Tenor 1-Month Notice
+  if (elements.tenor1mAlert) {
+    if (n === 1) {
+      elements.tenor1mAlert.classList.remove('hidden');
+      if (elements.tenor1mVal) {
+        elements.tenor1mVal.textContent = FinanceMath.formatRupiah(flat.totalInterest);
+      }
+    } else {
+      elements.tenor1mAlert.classList.add('hidden');
+    }
   }
 
   // Savings Banner
@@ -440,6 +462,17 @@ function updateDailyUI() {
   const activeMethod = state.dailyMethod;
   const isAmortizing = state.dailyFacilityType === 'AMORTIZING';
 
+  // Toggle Visibility Method Buttons vs PRK Notice Card
+  if (elements.dailyMethodContainer && elements.prkNoticeCard) {
+    if (isAmortizing) {
+      elements.dailyMethodContainer.classList.remove('hidden');
+      elements.prkNoticeCard.classList.add('hidden');
+    } else {
+      elements.dailyMethodContainer.classList.add('hidden');
+      elements.prkNoticeCard.classList.remove('hidden');
+    }
+  }
+
   // Label tenor ekuivalen
   if (elements.labelTenorEquiv) {
     const blnEquiv = (d.days / 30).toFixed(1);
@@ -467,22 +500,32 @@ function updateDailyUI() {
   // Suku bunga per hari
   elements.resDailyRate.textContent = d.dailyRatePercent.toFixed(6) + '% /hari';
   if (elements.resDailyRateSub) {
-    elements.resDailyRateSub.textContent = activeMethod === 'FLAT' 
-      ? `Rate nominal flat (Riil: ~${((state.rateAnnual * (2 * state.nMonths) / (state.nMonths + 1)) / d.basisDays).toFixed(4)}% /hari)` 
-      : `Rate acuan: ${state.rateAnnual}% p.a. / ${d.basisDays} hari`;
+    if (!isAmortizing) {
+      elements.resDailyRateSub.textContent = `Rate acuan: ${state.rateAnnual}% p.a. / ${d.basisDays} hari`;
+    } else {
+      elements.resDailyRateSub.textContent = activeMethod === 'FLAT' 
+        ? `Rate nominal flat (Riil: ~${((state.rateAnnual * (2 * state.nMonths) / (state.nMonths + 1)) / d.basisDays).toFixed(4)}% /hari)` 
+        : `Rate acuan: ${state.rateAnnual}% p.a. / ${d.basisDays} hari`;
+    }
   }
 
   // Bunga hari ini
   elements.resDailyAmount.textContent = FinanceMath.formatRupiah(d.dailyInterestAmount) + ' /hari';
   if (elements.resDailyAmountSub) {
-    elements.resDailyAmountSub.textContent = isAmortizing 
-      ? `Beban bunga pada hari ke-${d.days} (${activeMethod})` 
-      : `Beban 24 jam saldo Rp ${FinanceMath.formatNumber(d.principal)}`;
+    if (!isAmortizing) {
+      elements.resDailyAmountSub.textContent = `Beban 24 jam saldo Rp ${FinanceMath.formatNumber(d.principal)}`;
+    } else {
+      elements.resDailyAmountSub.textContent = d.remainingBalance > 0
+        ? `Beban hari ke-${d.days} (${activeMethod}) atas sisa pokok ${FinanceMath.formatRupiah(d.remainingBalance)}`
+        : `Pinjaman telah lunas pada hari ke-${d.days}`;
+    }
   }
 
   // Akumulasi bunga s.d. hari ini
   elements.resDailyAccrued.textContent = FinanceMath.formatRupiah(d.totalAccruedInterest);
-  elements.resDailyAccruedSub.textContent = `Total bunga ${d.days} hari (${activeMethod})`;
+  elements.resDailyAccruedSub.textContent = !isAmortizing
+    ? `Total bunga ${d.days} hari (PRK - Pokok Konstan)`
+    : `Total bunga ${d.days} hari (${activeMethod})`;
 
   // Total pelunasan
   elements.resDailyPayoff.textContent = FinanceMath.formatRupiah(d.totalEarlyPayoff);
@@ -492,7 +535,9 @@ function updateDailyUI() {
 
   // Update button label
   if (elements.btnQuickExportDailyText) {
-    elements.btnQuickExportDailyText.textContent = `Unduh Excel Bunga Harian (${activeMethod})`;
+    elements.btnQuickExportDailyText.textContent = !isAmortizing
+      ? 'Unduh Excel Bunga Harian (PRK)'
+      : `Unduh Excel Bunga Harian (${activeMethod})`;
   }
 
   // Update Daily Method Buttons Styling
@@ -514,69 +559,142 @@ function updateDailyUI() {
   // Render Head-to-Head Comparison on Day D
   if (elements.dailyCompDayNum) elements.dailyCompDayNum.textContent = d.days;
 
-  if (comp.flat && comp.effective && comp.annuity && elements.dailyHeadToHeadTbody) {
-    const savings = Math.round(comp.savingsVsFlat);
-    if (elements.dailyCompSavingsTag) {
-      elements.dailyCompSavingsTag.textContent = savings > 0 
-        ? `⭐ Hemat ${FinanceMath.formatRupiah(savings)} dengan Efektif` 
-        : 'Beban Bunga Sama di Awal Pinjaman';
-    }
+  if (elements.dailyHeadToHeadTbody) {
+    if (!isAmortizing) {
+      // TABEL KHUSUS PRK: Bandingkan PRK (pokok utuh) vs Kredit Berangsur Efektif vs Kredit Berangsur Flat
+      const prkInterest = d.totalAccruedInterest;
+      const amortEff = comp.amortizingEff;
+      const amortFlat = comp.amortizingFlat;
+      const effSavings = amortEff ? Math.round(prkInterest - amortEff.totalAccruedInterest) : 0;
 
-    elements.dailyHeadToHeadTbody.innerHTML = `
-      <tr class="hover:bg-slate-800/60 ${activeMethod === 'EFEKTIF' ? 'bg-emerald-950/40 text-emerald-200 font-bold' : ''}">
-        <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          Bunga Efektif (Sliding)
-        </td>
-        <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.effective.dailyInterestAmount)}</td>
-        <td class="px-3 py-2.5 text-right font-extrabold text-emerald-300">${FinanceMath.formatRupiah(comp.effective.totalAccruedInterest)}</td>
-        <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.effective.remainingBalance)}</td>
-        <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.effective.totalEarlyPayoff)}</td>
-        <td class="px-3 py-2.5 text-center">
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            ⭐ Paling Hemat
-          </span>
-        </td>
-      </tr>
-      <tr class="hover:bg-slate-800/60 ${activeMethod === 'ANUITAS' ? 'bg-indigo-950/40 text-indigo-200 font-bold' : ''}">
-        <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
-          <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
-          Bunga Anuitas (Cicilan Rata)
-        </td>
-        <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.annuity.dailyInterestAmount)}</td>
-        <td class="px-3 py-2.5 text-right font-extrabold text-indigo-300">${FinanceMath.formatRupiah(comp.annuity.totalAccruedInterest)}</td>
-        <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.annuity.remainingBalance)}</td>
-        <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.annuity.totalEarlyPayoff)}</td>
-        <td class="px-3 py-2.5 text-center">
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-            ⚖️ Teratur (KPR)
-          </span>
-        </td>
-      </tr>
-      <tr class="hover:bg-slate-800/60 ${activeMethod === 'FLAT' ? 'bg-amber-950/40 text-amber-200 font-bold' : ''}">
-        <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
-          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-          Bunga Flat (Tetap)
-        </td>
-        <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.flat.dailyInterestAmount)}</td>
-        <td class="px-3 py-2.5 text-right font-extrabold text-rose-300">${FinanceMath.formatRupiah(comp.flat.totalAccruedInterest)}</td>
-        <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.flat.remainingBalance)}</td>
-        <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.flat.totalEarlyPayoff)}</td>
-        <td class="px-3 py-2.5 text-center">
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-            ⚠️ Tertinggi
-          </span>
-        </td>
-      </tr>
-    `;
+      if (elements.dailyCompSavingsTag) {
+        elements.dailyCompSavingsTag.textContent = effSavings > 0
+          ? `💡 Beralih ke Kredit Berangsur Efektif Hemat ${FinanceMath.formatRupiah(effSavings)}!`
+          : `Mode PRK: Saldo Pokok Tetap Utuh`;
+      }
 
-    if (elements.dailyHeadToHeadNote) {
-      if (!isAmortizing) {
-        elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mode Rekening Koran (PRK):</strong> Saldo pokok pinjaman tetap utuh Rp ${FinanceMath.formatNumber(d.principal)} (tidak dicicil bulanan), sehingga beban bunga harian dihitung konstan atas penarikan pokok.`;
-      } else if (d.days <= 30) {
-        elements.dailyHeadToHeadNote.innerHTML = `ℹ️ <strong>Catatan Bulan ke-1 (Hari 1–30):</strong> Pada 30 hari pertama (sebelum cicilan bulan ke-1 dibayarkan), baki debet ketiga metode masih sama-sama 100% utuh (${FinanceMath.formatRupiah(d.principal)}). Geser durasi ke <strong>90, 180, atau 360 hari</strong> untuk melihat penurunan drastis bunga Efektif & Anuitas!`;
-      } else {
-        elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Analisis Penghematan (Hari ke-${d.days}):</strong> Karena pokok pinjaman dicicil tiap bulan, baki debet Efektif & Anuitas terus menyusut. Anda <strong>MENGHEMAT ${FinanceMath.formatRupiah(savings)}</strong> dengan Bunga Efektif dibanding Bunga Flat!`;
+      elements.dailyHeadToHeadTbody.innerHTML = `
+        <tr class="bg-blue-950/50 text-blue-200 font-bold border-b border-slate-700">
+          <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold text-white">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            Rekening Koran (PRK) - Pilihan Anda
+          </td>
+          <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(d.dailyInterestAmount)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-blue-300">${FinanceMath.formatRupiah(prkInterest)}</td>
+          <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(d.remainingBalance)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(d.totalEarlyPayoff)}</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              ⚡ Pokok Utuh (PRK)
+            </span>
+          </td>
+        </tr>
+        ${amortEff ? `
+        <tr class="hover:bg-slate-800/60 border-b border-slate-700">
+          <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold text-emerald-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Pinjaman Berangsur Efektif (Jika Dicicil)
+          </td>
+          <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(amortEff.dailyInterestAmount)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-emerald-300">${FinanceMath.formatRupiah(amortEff.totalAccruedInterest)}</td>
+          <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(amortEff.remainingBalance)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(amortEff.totalEarlyPayoff)}</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              ⭐ Hemat ${FinanceMath.formatRupiah(effSavings)}
+            </span>
+          </td>
+        </tr>` : ''}
+        ${amortFlat ? `
+        <tr class="hover:bg-slate-800/60">
+          <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold text-amber-300">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            Pinjaman Berangsur Flat (Bunga Pokok Awal)
+          </td>
+          <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(amortFlat.dailyInterestAmount)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-rose-300">${FinanceMath.formatRupiah(amortFlat.totalAccruedInterest)}</td>
+          <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(amortFlat.remainingBalance)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(amortFlat.totalEarlyPayoff)}</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              ⚠️ Beban Boros
+            </span>
+          </td>
+        </tr>` : ''}
+      `;
+
+      if (elements.dailyHeadToHeadNote) {
+        elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Mengapa Bunga PRK dan Flat sama-sama Rp ${FinanceMath.formatNumber(prkInterest)}?</strong> Karena pada PRK nasabah <strong>tidak mencicil pokok utang setiap bulan</strong> (saldo utang tetap 100% utuh ${FinanceMath.formatRupiah(d.principal)} selama ${d.days} hari). Bunga Efektif baru bisa menghemat pengeluaran (menjadi ${FinanceMath.formatRupiah(amortEff ? amortEff.totalAccruedInterest : 0)}) jika nasabah mengambil fasilitas <strong>Pinjaman Berangsur</strong> di mana pokok dicicil tiap bulan!`;
+      }
+    } else {
+      // TABEL AMORTIZING: Flat vs Efektif vs Anuitas
+      const savings = Math.round(comp.savingsVsFlat || 0);
+      if (elements.dailyCompSavingsTag) {
+        if (state.nMonths === 1 || d.days <= 30) {
+          elements.dailyCompSavingsTag.textContent = 'Beban Bunga Sama pada Bulan Pertama';
+        } else {
+          elements.dailyCompSavingsTag.textContent = savings > 0 
+            ? `⭐ Hemat ${FinanceMath.formatRupiah(savings)} dengan Efektif` 
+            : 'Beban Bunga Sama di Awal Pinjaman';
+        }
+      }
+
+      elements.dailyHeadToHeadTbody.innerHTML = `
+        <tr class="hover:bg-slate-800/60 ${activeMethod === 'EFEKTIF' ? 'bg-emerald-950/40 text-emerald-200 font-bold' : ''}">
+          <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Bunga Efektif (Sliding)
+          </td>
+          <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.effective.dailyInterestAmount)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-emerald-300">${FinanceMath.formatRupiah(comp.effective.totalAccruedInterest)}</td>
+          <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.effective.remainingBalance)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.effective.totalEarlyPayoff)}</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              ⭐ Paling Hemat
+            </span>
+          </td>
+        </tr>
+        <tr class="hover:bg-slate-800/60 ${activeMethod === 'ANUITAS' ? 'bg-indigo-950/40 text-indigo-200 font-bold' : ''}">
+          <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
+            <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+            Bunga Anuitas (Cicilan Rata)
+          </td>
+          <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.annuity.dailyInterestAmount)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-indigo-300">${FinanceMath.formatRupiah(comp.annuity.totalAccruedInterest)}</td>
+          <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.annuity.remainingBalance)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.annuity.totalEarlyPayoff)}</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              ⚖️ Teratur (KPR)
+            </span>
+          </td>
+        </tr>
+        <tr class="hover:bg-slate-800/60 ${activeMethod === 'FLAT' ? 'bg-amber-950/40 text-amber-200 font-bold' : ''}">
+          <td class="px-3 py-2.5 flex items-center gap-1.5 font-semibold">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            Bunga Flat (Tetap)
+          </td>
+          <td class="px-3 py-2.5 text-right font-medium">${FinanceMath.formatRupiah(comp.flat.dailyInterestAmount)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-rose-300">${FinanceMath.formatRupiah(comp.flat.totalAccruedInterest)}</td>
+          <td class="px-3 py-2.5 text-right">${FinanceMath.formatRupiah(comp.flat.remainingBalance)}</td>
+          <td class="px-3 py-2.5 text-right font-extrabold text-white">${FinanceMath.formatRupiah(comp.flat.totalEarlyPayoff)}</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              ⚠️ Tertinggi
+            </span>
+          </td>
+        </tr>
+      `;
+
+      if (elements.dailyHeadToHeadNote) {
+        if (state.nMonths === 1) {
+          elements.dailyHeadToHeadNote.innerHTML = `ℹ️ <strong>Catatan Tenor 1 Bulan:</strong> Karena hanya ada 1 bulan cicilan, pokok utang belum diamortisasi secara berkala sehingga total bunga Flat, Efektif, dan Anuitas sama-sama bernilai ${FinanceMath.formatRupiah(comp.flat.totalAccruedInterest)}. Coba ubah tenor pinjaman ke <strong>12 bulan (1 tahun)</strong> untuk melihat penghematan drastis Bunga Efektif!`;
+        } else if (d.days <= 30) {
+          elements.dailyHeadToHeadNote.innerHTML = `ℹ️ <strong>Catatan Bulan ke-1 (Hari 1–30):</strong> Pada 30 hari pertama (sebelum cicilan bulan ke-1 dibayarkan), baki debet ketiga metode masih sama-sama 100% utuh (${FinanceMath.formatRupiah(d.principal)}). Geser durasi ke <strong>90, 180, atau 360 hari</strong> untuk melihat penurunan drastis bunga Efektif & Anuitas!`;
+        } else {
+          elements.dailyHeadToHeadNote.innerHTML = `💡 <strong>Analisis Penghematan (Hari ke-${d.days}):</strong> Karena pokok pinjaman dicicil tiap bulan, baki debet Efektif & Anuitas terus menyusut. Anda <strong>MENGHEMAT ${FinanceMath.formatRupiah(savings)}</strong> dengan Bunga Efektif dibanding Bunga Flat!`;
+        }
       }
     }
   }
@@ -651,6 +769,58 @@ function setupEventListeners() {
       }
     });
   });
+
+  // Quick Tenor Chips
+  if (elements.btnTenorChips) {
+    elements.btnTenorChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const m = parseInt(chip.getAttribute('data-months'), 10);
+        state.nMonths = m;
+        elements.inputTenorMonths.value = m;
+        elements.inputTenorYears.value = (m / 12).toFixed(1);
+        elements.sliderTenor.value = m;
+        state.dailyDays = Math.min(365, m * 30);
+        elements.inputDailyDays.value = state.dailyDays;
+        elements.sliderDailyDays.value = Math.min(state.dailyDays, 365);
+        state.page = 1;
+        recalculateAll();
+      });
+    });
+  }
+
+  // Button Fix Tenor to 12M
+  if (elements.btnFixTo12m) {
+    elements.btnFixTo12m.addEventListener('click', () => {
+      state.nMonths = 12;
+      elements.inputTenorMonths.value = 12;
+      elements.inputTenorYears.value = '1.0';
+      elements.sliderTenor.value = 12;
+      state.dailyDays = 360;
+      elements.inputDailyDays.value = 360;
+      elements.sliderDailyDays.value = 360;
+      state.page = 1;
+      recalculateAll();
+    });
+  }
+
+  // Button Switch to Amortizing
+  if (elements.btnSwitchToAmortizing) {
+    elements.btnSwitchToAmortizing.addEventListener('click', () => {
+      state.dailyFacilityType = 'AMORTIZING';
+      recalculateAll();
+    });
+  }
+
+  // Button Sync Tenor Days
+  if (elements.btnSyncTenorDays) {
+    elements.btnSyncTenorDays.addEventListener('click', () => {
+      const targetDays = Math.min(365, state.nMonths * 30);
+      state.dailyDays = targetDays;
+      elements.inputDailyDays.value = targetDays;
+      elements.sliderDailyDays.value = Math.min(targetDays, 365);
+      recalculateAll();
+    });
+  }
 
   // Converter Mode Buttons
   elements.btnModeFlatToEff.addEventListener('click', () => {
@@ -770,16 +940,6 @@ function setupEventListeners() {
     state.dayCountConvention = e.target.value;
     recalculateAll();
   });
-
-  // Facility Type Buttons (Amortizing vs Rekening Koran)
-  if (elements.dailyFacilityButtons) {
-    elements.dailyFacilityButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.dailyFacilityType = btn.getAttribute('data-facility');
-        recalculateAll();
-      });
-    });
-  }
 
   // Facility Type Buttons (Amortizing vs Rekening Koran)
   if (elements.dailyFacilityButtons) {

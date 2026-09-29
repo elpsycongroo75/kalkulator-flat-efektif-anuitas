@@ -213,6 +213,29 @@
             <span>5 Thn (60)</span>
             <span>15 Thn (180)</span>
           </div>
+
+          <!-- Quick Tenor Chips -->
+          <div class="flex flex-wrap items-center gap-1 pt-1">
+            <button type="button" class="btn-tenor-chip px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-months="12">1 Thn (12 Bln)</button>
+            <button type="button" class="btn-tenor-chip px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-months="24">2 Thn (24 Bln)</button>
+            <button type="button" class="btn-tenor-chip px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-months="36">3 Thn (36 Bln)</button>
+            <button type="button" class="btn-tenor-chip px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-months="60">5 Thn (60 Bln)</button>
+          </div>
+
+          <!-- Tenor 1 Month Alert Box -->
+          <div id="tenor-1m-alert" class="hidden p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+            <div class="font-bold flex items-center gap-1">
+              <span>⚠️</span> Tenor 1 Bulan (0,1 Tahun)
+            </div>
+            <p class="text-[11px] leading-tight text-amber-800">
+              Pada tenor 1 bulan (hanya 1x pembayaran cicilan), skema Flat, Efektif, dan Anuitas secara matematis menghasilkan bunga yang sama (<span id="tenor-1m-val" class="font-bold">Rp 0</span>) karena belum terjadi penurunan pokok pinjaman berkala.
+            </p>
+            <div class="pt-0.5">
+              <button type="button" id="btn-fix-to-12m" class="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 cursor-pointer">
+                👉 Ubah ke 12 Bulan (1 Tahun) untuk melihat perbedaan hematnya Efektif
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- 4. TANGGAL & KONVENSI HARI -->
@@ -709,40 +732,63 @@
           </div>
         </div>
 
-        <!-- 2. PILIHAN METODE BUNGA HARIAN -->
+        <!-- 2. PILIHAN METODE BUNGA HARIAN ATAU PRK NOTICE -->
         <div class="space-y-2">
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Pilih Metode Perhitungan Bunga Harian:</label>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button type="button" data-daily-method="EFEKTIF" class="daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20">
-              <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">⚡</span>
-              <div>
-                <div class="font-bold text-xs flex items-center gap-1.5">
-                  Bunga Harian Efektif
-                  <span class="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold">Hemat</span>
+          <!-- Method Buttons (Tampil saat Pinjaman Berangsur) -->
+          <div id="daily-method-container">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Pilih Metode Perhitungan Bunga Harian:</label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1.5">
+              <button type="button" data-daily-method="EFEKTIF" class="daily-method-btn active p-3 rounded-xl border text-left flex items-start gap-3 transition bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20">
+                <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">⚡</span>
+                <div>
+                  <div class="font-bold text-xs flex items-center gap-1.5">
+                    Bunga Harian Efektif
+                    <span class="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold">Hemat</span>
+                  </div>
+                  <div class="text-[11px] text-emerald-700 mt-0.5">Bunga per hari menurun seiring berkurangnya baki debet pokok</div>
                 </div>
-                <div class="text-[11px] text-emerald-700 mt-0.5">Bunga per hari menurun seiring berkurangnya baki debet pokok</div>
-              </div>
-            </button>
-            <button type="button" data-daily-method="ANUITAS" class="daily-method-btn p-3 rounded-xl border text-left flex items-start gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300">
-              <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">🏦</span>
-              <div>
-                <div class="font-bold text-xs flex items-center gap-1.5">
-                  Bunga Harian Anuitas
-                  <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-semibold">KPR</span>
+              </button>
+              <button type="button" data-daily-method="ANUITAS" class="daily-method-btn p-3 rounded-xl border text-left flex items-start gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300">
+                <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">🏦</span>
+                <div>
+                  <div class="font-bold text-xs flex items-center gap-1.5">
+                    Bunga Harian Anuitas
+                    <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-semibold">KPR</span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">Bunga berjalan dihitung dari sisa pokok kurva anuitas</div>
                 </div>
-                <div class="text-[11px] text-slate-500 mt-0.5">Bunga berjalan dihitung dari sisa pokok kurva anuitas</div>
-              </div>
-            </button>
-            <button type="button" data-daily-method="FLAT" class="daily-method-btn p-3 rounded-xl border text-left flex items-start gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300">
-              <span class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">📊</span>
-              <div>
-                <div class="font-bold text-xs flex items-center gap-1.5">
-                  Bunga Harian Flat
-                  <span class="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded font-semibold">Boros</span>
+              </button>
+              <button type="button" data-daily-method="FLAT" class="daily-method-btn p-3 rounded-xl border text-left flex items-start gap-3 transition bg-white border-slate-200 text-slate-700 hover:border-slate-300">
+                <span class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">📊</span>
+                <div>
+                  <div class="font-bold text-xs flex items-center gap-1.5">
+                    Bunga Harian Flat
+                    <span class="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded font-semibold">Boros</span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">Beban bunga per hari konstan dari 100% plafon awal penuh</div>
                 </div>
-                <div class="text-[11px] text-slate-500 mt-0.5">Beban bunga per hari konstan dari 100% plafon awal penuh</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- PRK Dedicated Info Card (Tampil saat PRK) -->
+          <div id="prk-notice-card" class="hidden p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="font-bold text-xs flex items-center gap-2 text-blue-900">
+                <span class="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">⚡</span>
+                Fasilitas Rekening Koran (PRK): Murni Bunga Harian Efektif atas Saldo Penarikan
               </div>
-            </button>
+              <span class="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">Pokok Utuh</span>
+            </div>
+            <p class="text-xs text-blue-800 leading-relaxed">
+              Pada fasilitas PRK / Cerukan, nasabah <strong>tidak mencicil pokok setiap bulan</strong> (saldo utang tetap 100% utuh sampai pelunasan). Oleh karena itu, bunga harian dihitung murni harian efektif atas saldo penarikan riil dan <strong>tidak ada skema Flat atau Anuitas</strong>.
+            </p>
+            <div class="pt-1.5 border-t border-blue-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span class="text-[11px] text-blue-700">Ingin membandingkan perbedaan bunga hemat Efektif vs Flat?</span>
+              <button type="button" id="btn-switch-to-amortizing" class="text-xs font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-300 px-3 py-1 rounded-lg shadow-sm transition">
+                👉 Beralih ke Pinjaman Berangsur
+              </button>
+            </div>
           </div>
         </div>
 
@@ -750,7 +796,12 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
           <div class="space-y-1.5">
             <div class="flex justify-between items-center">
-              <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">Jumlah Hari Berjalan</label>
+              <div class="flex items-center gap-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">Jumlah Hari Berjalan</label>
+                <button type="button" id="btn-sync-tenor-days" class="text-[10px] text-blue-700 hover:text-blue-900 underline font-semibold cursor-pointer">
+                  (Samakan Tenor)
+                </button>
+              </div>
               <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded" id="label-tenor-equiv">360 Hari (1 Tahun)</span>
             </div>
             <input type="number" id="input-daily-days" min="1" max="3650" value="360" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition">

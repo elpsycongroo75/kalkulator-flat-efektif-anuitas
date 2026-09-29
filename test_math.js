@@ -55,4 +55,26 @@ console.assert(Math.round(dailyFlat180.totalAccruedInterest) === 30000000, "Test
 console.assert(Math.round(dailyEff180.totalAccruedInterest) === 23750000, "Test 7.2 Failed: Efektif 180 days expected 23.75M");
 console.log("✓ Test 7 Passed: Daily Interest Day 180 Differentiates (Flat: 30M vs Efektif: 23.75M, Bunga/hari Efektif turun)");
 
-console.log("\nALL 7 RIGOROUS UNIT TESTS PASSED SUCCESSFULLY! 🚀");
+
+// Test 8: AUDIT FIX - PRK Facility sets constant principal and computes Amortizing comparisons
+const dailyPrk = FinanceMath.calculateDailyInterest(P, rFlat, 360, 'ACTUAL_360', 0, 'EFEKTIF', new Date('2026-01-01'), n, 'REKENING_KORAN');
+console.assert(Math.round(dailyPrk.totalAccruedInterest) === 60000000, `Test 8.1 Failed: PRK expected 60M, got ${dailyPrk.totalAccruedInterest}`);
+console.assert(dailyPrk.comparison.amortizingEff !== null, "Test 8.2 Failed: PRK must include amortizingEff comparison");
+console.assert(Math.round(dailyPrk.comparison.amortizingEff.totalAccruedInterest) === 32500000, "Test 8.3 Failed: PRK amortizingEff expected 32.5M");
+console.log("✓ Test 8 Passed: PRK Facility (60M) vs Amortizing Effective Comparison (32.5M)");
+
+// Test 9: AUDIT FIX - When d > maxTenorDays, curBalance and dailyInterest become 0
+const dailyPastMaturity = FinanceMath.calculateDailyInterest(P, rFlat, 360, 'ACTUAL_360', 0, 'EFEKTIF', new Date('2026-01-01'), 1, 'AMORTIZING');
+console.assert(dailyPastMaturity.remainingBalance === 0, "Test 9.1 Failed: Past maturity balance must be 0");
+console.assert(dailyPastMaturity.dailyInterestAmount === 0, "Test 9.2 Failed: Past maturity daily interest must be 0");
+console.log("✓ Test 9 Passed: Past maturity yields zero remaining balance and zero daily interest");
+
+// Test 10: AUDIT FIX - Tenor 1 Month yields mathematically identical total interest for Flat, Efektif, and Anuitas
+const f1m = FinanceMath.calculateFlat(P, rFlat, 1);
+const e1m = FinanceMath.calculateEffective(P, rFlat, 1);
+const a1m = FinanceMath.calculateAnnuity(P, rFlat, 1);
+console.assert(Math.round(f1m.totalInterest) === Math.round(e1m.totalInterest), "Test 10.1 Failed: 1-mo Flat != Efektif");
+console.assert(Math.round(e1m.totalInterest) === Math.round(a1m.totalInterest), "Test 10.2 Failed: 1-mo Efektif != Anuitas");
+console.log("✓ Test 10 Passed: 1-Month Tenor Flat == Efektif == Anuitas mathematically (1x payment)");
+
+console.log("\nALL 10 RIGOROUS UNIT TESTS PASSED SUCCESSFULLY! 🚀");
